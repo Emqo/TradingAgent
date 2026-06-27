@@ -2,18 +2,21 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
+	"github.com/Emqo/TradingAgent/internal/tools"
 )
 
 // Agent represents the trading agent.
 type Agent struct {
 	llm      llm.Provider
 	exchange exchange.Exchange
+	registry *tools.Registry
 	config   Config
 }
 
@@ -25,10 +28,11 @@ type Config struct {
 }
 
 // New creates a new Agent.
-func New(llmProvider llm.Provider, exchangeProvider exchange.Exchange, cfg Config) *Agent {
+func New(llmProvider llm.Provider, exchangeProvider exchange.Exchange, registry *tools.Registry, cfg Config) *Agent {
 	return &Agent{
 		llm:      llmProvider,
 		exchange: exchangeProvider,
+		registry: registry,
 		config:   cfg,
 	}
 }
@@ -63,7 +67,7 @@ func (a *Agent) decide(ctx context.Context) error {
 	log.Println("---")
 	log.Println("🔄 Starting decision cycle...")
 
-	// Step 1: Observe
+	// Step 1: Observe - gather initial market data
 	log.Println("📊 Observing market data...")
 	observation, err := a.observe(ctx)
 	if err != nil {
@@ -71,15 +75,26 @@ func (a *Agent) decide(ctx context.Context) error {
 	}
 	log.Printf("   BTC: $%.2f", observation.BTCPrice)
 
-	// Step 2: Think
+	// Step 2: Think - send to LLM with tools
 	log.Println("🤔 Thinking...")
-	decision, err := a.think(ctx, observation)
+	response, err := a.think(ctx, observation)
 	if err != nil {
 		return fmt.Errorf("think: %w", err)
 	}
-	log.Printf("   Analysis: %s", decision)
 
-	// Step 3: Act (for now, just log)
+	// Step 3: Handle tool calls if any
+	if len(response.ToolCalls) > 0 {
+		log.Printf("🔧 Executing %d tool calls...", len(response.ToolCalls))
+		if err := a.handleToolCalls(ctx, response.ToolCalls); err != nil {
+			return fmt.Errorf("handle tool calls: %w", err)
+		}
+	}
+
+	// Step 4: Log the analysis
+	if response.Content != "" {
+		log.Printf("   Analysis: %s", response.Content)
+	}
+
 	log.Println("📝 Decision logged (no real trading yet)")
 
 	return nil
@@ -105,32 +120,80 @@ func (a *Agent) observe(ctx context.Context) (*Observation, error) {
 }
 
 // think sends the observation to the LLM for analysis.
-func (a *Agent) think(ctx context.Context, obs *Observation) (string, error) {
+func (a *Agent) think(ctx context.Context, obs *Observation) (*llm.Response, error) {
 	messages := []llm.Message{
 		{
 			Role: "system",
-			Content: `You are a crypto trading analyst. Analyze the market data and provide a brief assessment.
-Focus on:
-1. Current price level and trend
-2. Potential trading opportunities
-3. Risk factors
+			Content: `You are a crypto trading analyst with access to market data tools.
 
-Be concise. One paragraph max.`,
+Your capabilities:
+- Get real-time prices for any trading pair
+- View order book depth
+- Check account balance
+- Detect arbitrage opportunities
+
+When analyzing the market:
+1. Use tools to gather additional data if needed
+2. Identify potential trading opportunities
+3. Assess risk factors
+4. Provide actionable recommendations
+
+Be concise and focused on actionable insights.`,
 		},
 		{
 			Role: "user",
 			Content: fmt.Sprintf(
-				"Current BTC/USDT price: $%.2f\nTime: %s\n\nGive your analysis.",
+				"Current BTC/USDT price: $%.2f\nTime: %s\n\nAnalyze the market and identify any trading opportunities. Use tools if you need more data.",
 				obs.BTCPrice,
 				obs.Timestamp.Format(time.RFC3339),
 			),
 		},
 	}
 
-	resp, err := a.llm.Chat(ctx, messages, llm.WithMaxTokens(a.config.MaxTokens))
+	// Convert tools to LLM format
+	llmTools := a.registry.ToLLMTools()
+
+	resp, err := a.llm.ChatWithTools(ctx, messages, llmTools, llm.WithMaxTokens(a.config.MaxTokens))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return resp.Content, nil
+	return resp, nil
+}
+
+// handleToolCalls executes tool calls from the LLM.
+func (a *Agent) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
+	for _, tc := range toolCalls {
+		log.Printf("   🔧 Tool: %s", tc.Name)
+
+		// Get the tool
+		tool, err := a.registry.Get(tc.Name)
+		if err != nil {
+			log.Printf("   ❌ Tool not found: %v", err)
+			continue
+		}
+
+		// Parse arguments
+		var args map[string]any
+		if err := json.Unmarshal([]byte(tc.Arguments), &args); err != nil {
+			log.Printf("   ❌ Invalid arguments: %v", err)
+			continue
+		}
+
+		// Execute the tool
+		result, err := tool.Execute(ctx, args)
+		if err != nil {
+			log.Printf("   ❌ Execution error: %v", err)
+			continue
+		}
+
+		// Log result
+		if result.Success {
+			log.Printf("   ✅ Success: %v", result.Data)
+		} else {
+			log.Printf("   ⚠️ Error: %s", result.Error)
+		}
+	}
+
+	return nil
 }

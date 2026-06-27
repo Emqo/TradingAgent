@@ -13,6 +13,7 @@ import (
 	"github.com/Emqo/TradingAgent/internal/agent"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
+	"github.com/Emqo/TradingAgent/internal/tools"
 )
 
 func main() {
@@ -48,18 +49,29 @@ func main() {
 		cfg.Binance.Testnet,
 	)
 
+	// Create tool registry and register tools
+	registry := tools.NewRegistry()
+	registry.Register(tools.NewGetTickerTool(exchangeProvider))
+	registry.Register(tools.NewGetOrderBookTool(exchangeProvider))
+	registry.Register(tools.NewGetBalanceTool(exchangeProvider))
+	registry.Register(tools.NewPlaceOrderTool(exchangeProvider))
+	registry.Register(tools.NewGetOrderStatusTool(exchangeProvider))
+	registry.Register(tools.NewDetectArbitrageTool(exchangeProvider))
+
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
-	fmt.Println("║         TradingAgent v0.1.0              ║")
+	fmt.Println("║         TradingAgent v0.2.0              ║")
+	fmt.Println("║         Phase 2: Tool System             ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
 	fmt.Printf("  Exchange: %s (testnet: %v)\n", exchangeProvider.Name(), cfg.Binance.Testnet)
 	fmt.Printf("  Interval: %s\n", interval)
+	fmt.Printf("  Tools:    %d registered\n", len(registry.List()))
 	fmt.Println()
 
 	// Create agent
-	tradingAgent := agent.New(llmProvider, exchangeProvider, agent.Config{
+	tradingAgent := agent.New(llmProvider, exchangeProvider, registry, agent.Config{
 		Interval:    interval,
 		MaxTokens:   cfg.Agent.MaxTokens,
 		Temperature: cfg.Agent.Temperature,

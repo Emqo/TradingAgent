@@ -87,12 +87,20 @@ func (p *ClaudeProvider) ChatWithTools(ctx context.Context, messages []Message, 
 
 	// Convert tools
 	for _, tool := range tools {
+		// Extract properties from the JSON schema
+		var properties any
+		if params, ok := tool.Parameters.(map[string]any); ok {
+			if props, exists := params["properties"]; exists {
+				properties = props
+			}
+		}
+
 		req.Tools = append(req.Tools, anthropic.ToolUnionParam{
 			OfTool: &anthropic.ToolParam{
 				Name:        tool.Name,
 				Description: anthropic.String(tool.Description),
 				InputSchema: anthropic.ToolInputSchemaParam{
-					Properties: tool.Parameters,
+					Properties: properties,
 				},
 			},
 		})
