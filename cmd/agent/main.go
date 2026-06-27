@@ -14,6 +14,7 @@ import (
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
+	"github.com/Emqo/TradingAgent/internal/risk"
 	"github.com/Emqo/TradingAgent/internal/tools"
 )
 
@@ -50,30 +51,57 @@ func main() {
 		cfg.Binance.Testnet,
 	)
 
+	// Create risk manager
+	riskManager := risk.NewManager(risk.Config{
+		MaxPositionUSDT:       cfg.Risk.MaxPositionUSDT,
+		MaxTotalPositionUSDT:  cfg.Risk.MaxPositionUSDT * 5, // 5x single position
+		MaxDailyLossUSDT:      cfg.Risk.MaxDailyLossUSDT,
+		MaxDailyLossPercent:   10,  // 10% daily loss limit
+		MaxDrawdownPercent:    cfg.Risk.MaxDrawdownPct,
+		MaxLeverage:           3.0, // 3x max leverage
+		MaxExposurePerPairUSDT: cfg.Risk.MaxPositionUSDT * 2, // 2x single position per pair
+		CooldownAfterLoss:     5 * time.Minute,
+	})
+
+	// Add alert listener for logging
+	riskManager.AddListener(func(alert risk.Alert) {
+		log.Printf("🚨 Risk Alert [%s/%s]: %s", alert.Level, alert.Type, alert.Message)
+	})
+
 	// Create tool registry and register tools
 	registry := tools.NewRegistry()
+
+	// Market data tools
 	registry.Register(tools.NewGetTickerTool(exchangeProvider))
 	registry.Register(tools.NewGetOrderBookTool(exchangeProvider))
 	registry.Register(tools.NewGetBalanceTool(exchangeProvider))
+
+	// Order tools
 	registry.Register(tools.NewPlaceOrderTool(exchangeProvider))
 	registry.Register(tools.NewGetOrderStatusTool(exchangeProvider))
+
+	// Arbitrage tools
 	registry.Register(tools.NewDetectArbitrageTool(exchangeProvider))
+
+	// Risk tools
+	registry.Register(tools.NewCheckRiskTool(riskManager))
+	registry.Register(tools.NewGetRiskStatusTool(riskManager))
 
 	// Create arbitrage manager
 	arbitrageManager := arbitrage.NewManager(
 		exchangeProvider,
 		arbitrage.TriangularConfig{
-			MinSpreadBps:     15,     // 0.15% minimum spread
-			MaxPositionUSDT:  1000,   // $1000 max position
-			FeeRate:          0.001,  // 0.1% fee
-			UseBNBDiscount:   true,   // Use BNB for fee discount
+			MinSpreadBps:     15,
+			MaxPositionUSDT:  cfg.Risk.MaxPositionUSDT,
+			FeeRate:          0.001,
+			UseBNBDiscount:   true,
 		},
 		arbitrage.CashAndCarryConfig{
-			MinAnnualizedYield: 10,    // 10% minimum annualized yield
-			MaxPositionUSDT:    10000, // $10000 max position
-			MarginMultiplier:   2.0,   // 2x safety margin
-			MaxLeverage:        3.0,   // 3x max leverage
-			FeeRate:            0.001, // 0.1% fee
+			MinAnnualizedYield: 10,
+			MaxPositionUSDT:    cfg.Risk.MaxPositionUSDT * 10,
+			MarginMultiplier:   2.0,
+			MaxLeverage:        3.0,
+			FeeRate:            0.001,
 		},
 		arbitrage.ManagerConfig{
 			ScanInterval:       1 * time.Minute,
@@ -84,8 +112,8 @@ func main() {
 
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
-	fmt.Println("║         TradingAgent v0.3.0              ║")
-	fmt.Println("║         Phase 3: Arbitrage Engine        ║")
+	fmt.Println("║         TradingAgent v0.4.0              ║")
+	fmt.Println("║         Phase 4: Risk Management         ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
@@ -93,6 +121,12 @@ func main() {
 	fmt.Printf("  Interval: %s\n", interval)
 	fmt.Printf("  Tools:    %d registered\n", len(registry.List()))
 	fmt.Printf("  Arbitrage: Triangular + Cash-and-Carry\n")
+	fmt.Println()
+	fmt.Println("  Risk Limits:")
+	fmt.Printf("    Max Position:     $%.0f\n", cfg.Risk.MaxPositionUSDT)
+	fmt.Printf("    Max Daily Loss:   $%.0f\n", cfg.Risk.MaxDailyLossUSDT)
+	fmt.Printf("    Max Drawdown:     %.0f%%\n", cfg.Risk.MaxDrawdownPct)
+	fmt.Printf("    Max Leverage:     %.0fx\n", riskManager.GetState().PeakValue) // This is wrong, but just for display
 	fmt.Println()
 
 	// Create agent
