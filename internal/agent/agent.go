@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
+	"github.com/Emqo/TradingAgent/internal/logger"
 	"github.com/Emqo/TradingAgent/internal/metrics"
 	"github.com/Emqo/TradingAgent/internal/tools"
 )
@@ -22,6 +22,7 @@ type Agent struct {
 	arbitrage *arbitrage.Manager
 	session   *llm.Session
 	metrics   *metrics.Metrics
+	logger    *logger.Logger
 	config    Config
 }
 
@@ -39,6 +40,7 @@ func New(
 	registry *tools.Registry,
 	arbitrageManager *arbitrage.Manager,
 	metricsInstance *metrics.Metrics,
+	log *logger.Logger,
 	cfg Config,
 ) *Agent {
 	// Create session with system prompt
@@ -69,30 +71,31 @@ Be concise and focused on actionable insights.`
 		arbitrage: arbitrageManager,
 		session:   session,
 		metrics:   metricsInstance,
+		logger:    log,
 		config:    cfg,
 	}
 }
 
 // Run starts the agent's decision loop.
 func (a *Agent) Run(ctx context.Context) error {
-	log.Println("🤖 Agent started")
+	a.logger.Info("Agent started")
 
 	ticker := time.NewTicker(a.config.Interval)
 	defer ticker.Stop()
 
 	// Run immediately on start
 	if err := a.decide(ctx); err != nil {
-		log.Printf("❌ Decision error: %v", err)
+		a.logger.Errorf("Decision error: %v", err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("🛑 Agent stopped")
+			a.logger.Info("Agent stopped")
 			return nil
 		case <-ticker.C:
 			if err := a.decide(ctx); err != nil {
-				log.Printf("❌ Decision error: %v", err)
+				a.logger.Errorf("Decision error: %v", err)
 			}
 		}
 	}
@@ -100,26 +103,26 @@ func (a *Agent) Run(ctx context.Context) error {
 
 // decide performs one iteration of the Observe → Think → Act loop.
 func (a *Agent) decide(ctx context.Context) error {
-	log.Println("---")
-	log.Println("🔄 Starting decision cycle...")
+	a.logger.Debug("Starting decision cycle")
 
 	// Step 1: Observe - gather initial market data
-	log.Println("📊 Observing market data...")
+	a.logger.Debug("Observing market data")
 	observation, err := a.observe(ctx)
 	if err != nil {
 		return fmt.Errorf("observe: %w", err)
 	}
-	log.Printf("   BTC: $%.2f", observation.BTCPrice)
+	a.logger.WithField("btc_price", observation.BTCPrice).Info("Market data observed")
 
 	// Step 2: Scan for arbitrage opportunities
-	log.Println("🔍 Scanning for arbitrage opportunities...")
+	a.logger.Debug("Scanning for arbitrage opportunities")
 	arbResult, err := a.arbitrage.Scan(ctx)
 	if err != nil {
-		log.Printf("   ⚠️ Arbitrage scan error: %v", err)
+		a.logger.Warnf("Arbitrage scan error: %v", err)
 	} else {
-		log.Printf("   Found %d triangular, %d cash-and-carry opportunities",
-			len(arbResult.TriangularOpportunities),
-			len(arbResult.CashAndCarryOpportunities))
+		a.logger.WithFields(map[string]any{
+			"triangular":    len(arbResult.TriangularOpportunities),
+			"cash_and_carry": len(arbResult.CashAndCarryOpportunities),
+		}).Info("Arbitrage scan completed")
 
 		// Record arbitrage metrics
 		for _, opp := range arbResult.TriangularOpportunities {
@@ -132,7 +135,7 @@ func (a *Agent) decide(ctx context.Context) error {
 	}
 
 	// Step 3: Think - send to LLM with tools
-	log.Println("🤔 Thinking...")
+	a.logger.Debug("Thinking")
 	startTime := time.Now()
 	response, err := a.think(ctx, observation, arbResult)
 	llmLatency := time.Since(startTime).Seconds()
@@ -146,9 +149,15 @@ func (a *Agent) decide(ctx context.Context) error {
 	a.metrics.RecordLLMLatency(a.llm.Name(), llmLatency)
 	a.metrics.RecordLLMTokens(a.llm.Name(), "total", response.TokenUsage.TotalTokens)
 
+	a.logger.WithFields(map[string]any{
+		"latency_seconds": llmLatency,
+		"tokens":          response.TokenUsage.TotalTokens,
+		"tool_calls":      len(response.ToolCalls),
+	}).Info("LLM response received")
+
 	// Step 4: Handle tool calls if any
 	if len(response.ToolCalls) > 0 {
-		log.Printf("🔧 Executing %d tool calls...", len(response.ToolCalls))
+		a.logger.WithField("count", len(response.ToolCalls)).Info("Executing tool calls")
 		if err := a.handleToolCalls(ctx, response.ToolCalls); err != nil {
 			return fmt.Errorf("handle tool calls: %w", err)
 		}
@@ -156,12 +165,12 @@ func (a *Agent) decide(ctx context.Context) error {
 
 	// Step 5: Log the analysis
 	if response.Content != "" {
-		log.Printf("   Analysis: %s", response.Content)
+		a.logger.WithField("analysis", response.Content).Info("Analysis completed")
 	}
 
 	// Step 6: Store decision in session
 	a.session.AddMessage(llm.Message{
-		Role:    "user",
+		Role: "user",
 		Content: fmt.Sprintf("BTC: $%.2f, Arbitrage: %d triangular, %d cash-and-carry",
 			observation.BTCPrice,
 			len(arbResult.TriangularOpportunities),
@@ -172,7 +181,7 @@ func (a *Agent) decide(ctx context.Context) error {
 		Content: response.Content,
 	})
 
-	log.Println("📝 Decision logged (no real trading yet)")
+	a.logger.Info("Decision logged")
 
 	return nil
 }
@@ -247,34 +256,34 @@ func (a *Agent) think(ctx context.Context, obs *Observation, arbResult *arbitrag
 // handleToolCalls executes tool calls from the LLM.
 func (a *Agent) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
 	for _, tc := range toolCalls {
-		log.Printf("   🔧 Tool: %s", tc.Name)
+		a.logger.WithField("tool", tc.Name).Debug("Executing tool")
 
 		// Get the tool
 		tool, err := a.registry.Get(tc.Name)
 		if err != nil {
-			log.Printf("   ❌ Tool not found: %v", err)
+			a.logger.WithField("tool", tc.Name).Errorf("Tool not found: %v", err)
 			continue
 		}
 
 		// Parse arguments
 		var args map[string]any
 		if err := json.Unmarshal([]byte(tc.Arguments), &args); err != nil {
-			log.Printf("   ❌ Invalid arguments: %v", err)
+			a.logger.WithField("tool", tc.Name).Errorf("Invalid arguments: %v", err)
 			continue
 		}
 
 		// Execute the tool
 		result, err := tool.Execute(ctx, args)
 		if err != nil {
-			log.Printf("   ❌ Execution error: %v", err)
+			a.logger.WithField("tool", tc.Name).Errorf("Execution error: %v", err)
 			continue
 		}
 
 		// Log result
 		if result.Success {
-			log.Printf("   ✅ Success: %v", result.Data)
+			a.logger.WithField("tool", tc.Name).Debug("Tool executed successfully")
 		} else {
-			log.Printf("   ⚠️ Error: %s", result.Error)
+			a.logger.WithField("tool", tc.Name).Warnf("Tool error: %s", result.Error)
 		}
 	}
 

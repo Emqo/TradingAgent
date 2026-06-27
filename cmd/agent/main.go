@@ -14,6 +14,7 @@ import (
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
+	"github.com/Emqo/TradingAgent/internal/logger"
 	"github.com/Emqo/TradingAgent/internal/memory"
 	"github.com/Emqo/TradingAgent/internal/metrics"
 	"github.com/Emqo/TradingAgent/internal/risk"
@@ -133,21 +134,26 @@ func main() {
 		},
 	)
 
+	// Create logger
+	logLevel := logger.LevelInfo
+	log := logger.New(logLevel, os.Stdout)
+	logger.SetDefault(log)
+
 	// Create metrics
 	metricsInstance := metrics.NewMetrics()
 
 	// Start metrics server in background
 	go func() {
-		log.Println("📊 Starting metrics server on :9090...")
+		log.Info("Starting metrics server on :9090")
 		if err := metrics.StartMetricsServer(":9090"); err != nil {
-			log.Printf("⚠️ Metrics server error: %v", err)
+			log.Errorf("Metrics server error: %v", err)
 		}
 	}()
 
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
-	fmt.Println("║         TradingAgent v0.6.0              ║")
-	fmt.Println("║     Prometheus Monitoring                ║")
+	fmt.Println("║         TradingAgent v0.7.0              ║")
+	fmt.Println("║     Structured Logging                   ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
@@ -155,6 +161,7 @@ func main() {
 	fmt.Printf("  Interval: %s\n", interval)
 	fmt.Printf("  Tools:    %d registered\n", len(registry.List()))
 	fmt.Printf("  Memory:   Short-term: 100, Long-term: 1000\n")
+	fmt.Printf("  Logging:  JSON structured\n")
 	fmt.Println()
 
 	// Create agent
@@ -164,6 +171,7 @@ func main() {
 		registry,
 		arbitrageManager,
 		metricsInstance,
+		log,
 		agent.Config{
 			Interval:    interval,
 			MaxTokens:   cfg.Agent.MaxTokens,
@@ -180,13 +188,14 @@ func main() {
 
 	go func() {
 		sig := <-sigChan
-		log.Printf("Received signal %v, shutting down...", sig)
+		log.WithField("signal", sig).Info("Received signal, shutting down")
 		cancel()
 	}()
 
 	// Run agent
-	log.Println("Starting agent...")
+	log.Info("Starting agent")
 	if err := tradingAgent.Run(ctx); err != nil {
-		log.Fatalf("Agent error: %v", err)
+		log.Errorf("Agent error: %v", err)
+		os.Exit(1)
 	}
 }
