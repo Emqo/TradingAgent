@@ -48,13 +48,20 @@ func main() {
 		providerCfg.Model,
 	)
 
-	// Create Binance exchange (with caching)
-	binanceExchange := exchange.NewBinanceExchange(
+	// Create Binance exchange (with WebSocket for real-time data)
+	wsExchange := exchange.NewWebSocketExchange(
 		cfg.Binance.APIKey,
 		cfg.Binance.APISecret,
 		cfg.Binance.Testnet,
 	)
-	exchangeProvider := exchange.NewCachedExchange(binanceExchange)
+
+	// Connect WebSocket
+	if err := wsExchange.Connect(); err != nil {
+		logger.Warnf("WebSocket connection failed, using REST only: %v", err)
+	} else {
+		logger.Info("WebSocket connected for real-time data")
+	}
+	exchangeProvider := wsExchange
 
 	// Create memory manager
 	memoryManager := memory.NewManager(100, 1000) // 100 short-term, 1000 long-term
