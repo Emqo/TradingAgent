@@ -15,6 +15,18 @@ type Exchange interface {
 
 	// GetOrderBook returns the order book depth for a symbol.
 	GetOrderBook(ctx context.Context, symbol string, depth int) (*OrderBook, error)
+
+	// PlaceOrder places a new order.
+	PlaceOrder(ctx context.Context, params OrderParams) (*Order, error)
+
+	// GetOrder returns the status of an order.
+	GetOrder(ctx context.Context, symbol string, orderID string) (*Order, error)
+
+	// CancelOrder cancels an order.
+	CancelOrder(ctx context.Context, symbol string, orderID string) error
+
+	// GetOpenOrders returns all open orders for a symbol.
+	GetOpenOrders(ctx context.Context, symbol string) ([]Order, error)
 }
 
 // Ticker represents a price ticker.
@@ -29,10 +41,10 @@ type Ticker struct {
 
 // Balance represents an asset balance.
 type Balance struct {
-	Asset     string  `json:"asset"`
-	Free      float64 `json:"free"`
-	Locked    float64 `json:"locked"`
-	Total     float64 `json:"total"`
+	Asset  string  `json:"asset"`
+	Free   float64 `json:"free"`
+	Locked float64 `json:"locked"`
+	Total  float64 `json:"total"`
 }
 
 // OrderBook represents the order book.
@@ -46,4 +58,30 @@ type OrderBook struct {
 type OrderRow struct {
 	Price    float64 `json:"price"`
 	Quantity float64 `json:"quantity"`
+}
+
+// OrderParams represents the parameters for placing an order.
+type OrderParams struct {
+	Symbol      string  `json:"symbol"`
+	Side        string  `json:"side"`        // "BUY" or "SELL"
+	Type        string  `json:"type"`        // "MARKET" or "LIMIT"
+	Quantity    float64 `json:"quantity"`
+	Price       float64 `json:"price"`       // Required for LIMIT orders
+	TimeInForce string  `json:"time_in_force"` // "GTC", "IOC", "FOK"
+}
+
+// Order represents an order.
+type Order struct {
+	OrderID       string  `json:"order_id"`
+	Symbol        string  `json:"symbol"`
+	Side          string  `json:"side"`
+	Type          string  `json:"type"`
+	Status        string  `json:"status"`      // "NEW", "FILLED", "PARTIALLY_FILLED", "CANCELED", "REJECTED"
+	Price         float64 `json:"price"`
+	Quantity      float64 `json:"quantity"`
+	ExecutedQty   float64 `json:"executed_qty"`
+	CumulativeQty float64 `json:"cumulative_qty"`
+	TimeInForce   string  `json:"time_in_force"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
 }

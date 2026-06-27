@@ -114,3 +114,72 @@ func (e *CachedExchange) InvalidateOrderBook(symbol string, depth int) {
 func (e *CachedExchange) ClearCache() {
 	e.cache.Clear()
 }
+
+// PlaceOrder places a new order (no caching, invalidates balance).
+func (e *CachedExchange) PlaceOrder(ctx context.Context, params OrderParams) (*Order, error) {
+	order, err := e.exchange.PlaceOrder(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Invalidate balance cache after placing order
+	e.InvalidateBalance()
+
+	return order, nil
+}
+
+// GetOrder returns the status of an order (cached for 2 seconds).
+func (e *CachedExchange) GetOrder(ctx context.Context, symbol string, orderID string) (*Order, error) {
+	cacheKey := fmt.Sprintf("order:%s:%s", symbol, orderID)
+
+	// Try cache first
+	if val, ok := e.cache.Get(cacheKey); ok {
+		return val.(*Order), nil
+	}
+
+	// Fetch from exchange
+	order, err := e.exchange.GetOrder(ctx, symbol, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache for 2 seconds
+	e.cache.Set(cacheKey, order, 2*time.Second)
+
+	return order, nil
+}
+
+// CancelOrder cancels an order (no caching, invalidates balance and order cache).
+func (e *CachedExchange) CancelOrder(ctx context.Context, symbol string, orderID string) error {
+	err := e.exchange.CancelOrder(ctx, symbol, orderID)
+	if err != nil {
+		return err
+	}
+
+	// Invalidate caches
+	e.InvalidateBalance()
+	e.cache.Delete(fmt.Sprintf("order:%s:%s", symbol, orderID))
+
+	return nil
+}
+
+// GetOpenOrders returns all open orders for a symbol (cached for 5 seconds).
+func (e *CachedExchange) GetOpenOrders(ctx context.Context, symbol string) ([]Order, error) {
+	cacheKey := fmt.Sprintf("open_orders:%s", symbol)
+
+	// Try cache first
+	if val, ok := e.cache.Get(cacheKey); ok {
+		return val.([]Order), nil
+	}
+
+	// Fetch from exchange
+	orders, err := e.exchange.GetOpenOrders(ctx, symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache for 5 seconds
+	e.cache.Set(cacheKey, orders, 5*time.Second)
+
+	return orders, nil
+}

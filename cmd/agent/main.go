@@ -91,6 +91,8 @@ func main() {
 	// Order tools
 	registry.Register(tools.NewPlaceOrderTool(exchangeProvider))
 	registry.Register(tools.NewGetOrderStatusTool(exchangeProvider))
+	registry.Register(tools.NewCancelOrderTool(exchangeProvider))
+	registry.Register(tools.NewGetOpenOrdersTool(exchangeProvider))
 
 	// Arbitrage tools
 	registry.Register(tools.NewDetectArbitrageTool(exchangeProvider))

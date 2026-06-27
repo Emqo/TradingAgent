@@ -180,9 +180,203 @@ func (e *BinanceExchange) doRequest(ctx context.Context, method, path string, pa
 	return body, nil
 }
 
+// PlaceOrder places a new order on Binance.
+func (e *BinanceExchange) PlaceOrder(ctx context.Context, params OrderParams) (*Order, error) {
+	// Build query parameters
+	values := url.Values{}
+	values.Set("symbol", params.Symbol)
+	values.Set("side", params.Side)
+	values.Set("type", params.Type)
+	values.Set("quantity", formatFloat(params.Quantity))
+
+	if params.Type == "LIMIT" {
+		if params.Price <= 0 {
+			return nil, fmt.Errorf("price is required for LIMIT orders")
+		}
+		values.Set("price", formatFloat(params.Price))
+		if params.TimeInForce == "" {
+			values.Set("timeInForce", "GTC") // Good Till Cancel
+		} else {
+			values.Set("timeInForce", params.TimeInForce)
+		}
+	}
+
+	// Place the order
+	resp, err := e.doRequest(ctx, "POST", "/api/v3/order", values, true)
+	if err != nil {
+		return nil, fmt.Errorf("place order: %w", err)
+	}
+
+	// Parse response
+	var result struct {
+		OrderID       int64  `json:"orderId"`
+		Symbol        string `json:"symbol"`
+		Side          string `json:"side"`
+		Type          string `json:"type"`
+		Status        string `json:"status"`
+		Price         string `json:"price"`
+		Quantity      string `json:"origQty"`
+		ExecutedQty   string `json:"executedQty"`
+		CumulativeQty string `json:"cummulativeQuoteQty"`
+		TimeInForce   string `json:"timeInForce"`
+		TransactTime  int64  `json:"transactTime"`
+	}
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("parse order response: %w", err)
+	}
+
+	// Convert to Order
+	order := &Order{
+		OrderID:       strconv.FormatInt(result.OrderID, 10),
+		Symbol:        result.Symbol,
+		Side:          result.Side,
+		Type:          result.Type,
+		Status:        result.Status,
+		Price:         parseFloat(result.Price),
+		Quantity:      parseFloat(result.Quantity),
+		ExecutedQty:   parseFloat(result.ExecutedQty),
+		CumulativeQty: parseFloat(result.CumulativeQty),
+		TimeInForce:   result.TimeInForce,
+		CreatedAt:     formatTimestamp(result.TransactTime),
+		UpdatedAt:     formatTimestamp(result.TransactTime),
+	}
+
+	return order, nil
+}
+
+// GetOrder returns the status of an order.
+func (e *BinanceExchange) GetOrder(ctx context.Context, symbol string, orderID string) (*Order, error) {
+	values := url.Values{}
+	values.Set("symbol", symbol)
+	values.Set("orderId", orderID)
+
+	resp, err := e.doRequest(ctx, "GET", "/api/v3/order", values, true)
+	if err != nil {
+		return nil, fmt.Errorf("get order: %w", err)
+	}
+
+	var result struct {
+		OrderID       int64  `json:"orderId"`
+		Symbol        string `json:"symbol"`
+		Side          string `json:"side"`
+		Type          string `json:"type"`
+		Status        string `json:"status"`
+		Price         string `json:"price"`
+		Quantity      string `json:"origQty"`
+		ExecutedQty   string `json:"executedQty"`
+		CumulativeQty string `json:"cummulativeQuoteQty"`
+		TimeInForce   string `json:"timeInForce"`
+		Time          int64  `json:"time"`
+		UpdateTime    int64  `json:"updateTime"`
+	}
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("parse order: %w", err)
+	}
+
+	order := &Order{
+		OrderID:       strconv.FormatInt(result.OrderID, 10),
+		Symbol:        result.Symbol,
+		Side:          result.Side,
+		Type:          result.Type,
+		Status:        result.Status,
+		Price:         parseFloat(result.Price),
+		Quantity:      parseFloat(result.Quantity),
+		ExecutedQty:   parseFloat(result.ExecutedQty),
+		CumulativeQty: parseFloat(result.CumulativeQty),
+		TimeInForce:   result.TimeInForce,
+		CreatedAt:     formatTimestamp(result.Time),
+		UpdatedAt:     formatTimestamp(result.UpdateTime),
+	}
+
+	return order, nil
+}
+
+// CancelOrder cancels an order.
+func (e *BinanceExchange) CancelOrder(ctx context.Context, symbol string, orderID string) error {
+	values := url.Values{}
+	values.Set("symbol", symbol)
+	values.Set("orderId", orderID)
+
+	_, err := e.doRequest(ctx, "DELETE", "/api/v3/order", values, true)
+	if err != nil {
+		return fmt.Errorf("cancel order: %w", err)
+	}
+
+	return nil
+}
+
+// GetOpenOrders returns all open orders for a symbol.
+func (e *BinanceExchange) GetOpenOrders(ctx context.Context, symbol string) ([]Order, error) {
+	values := url.Values{}
+	if symbol != "" {
+		values.Set("symbol", symbol)
+	}
+
+	resp, err := e.doRequest(ctx, "GET", "/api/v3/openOrders", values, true)
+	if err != nil {
+		return nil, fmt.Errorf("get open orders: %w", err)
+	}
+
+	var results []struct {
+		OrderID       int64  `json:"orderId"`
+		Symbol        string `json:"symbol"`
+		Side          string `json:"side"`
+		Type          string `json:"type"`
+		Status        string `json:"status"`
+		Price         string `json:"price"`
+		Quantity      string `json:"origQty"`
+		ExecutedQty   string `json:"executedQty"`
+		CumulativeQty string `json:"cummulativeQuoteQty"`
+		TimeInForce   string `json:"timeInForce"`
+		Time          int64  `json:"time"`
+		UpdateTime    int64  `json:"updateTime"`
+	}
+	if err := json.Unmarshal(resp, &results); err != nil {
+		return nil, fmt.Errorf("parse orders: %w", err)
+	}
+
+	orders := make([]Order, 0, len(results))
+	for _, r := range results {
+		orders = append(orders, Order{
+			OrderID:       strconv.FormatInt(r.OrderID, 10),
+			Symbol:        r.Symbol,
+			Side:          r.Side,
+			Type:          r.Type,
+			Status:        r.Status,
+			Price:         parseFloat(r.Price),
+			Quantity:      parseFloat(r.Quantity),
+			ExecutedQty:   parseFloat(r.ExecutedQty),
+			CumulativeQty: parseFloat(r.CumulativeQty),
+			TimeInForce:   r.TimeInForce,
+			CreatedAt:     formatTimestamp(r.Time),
+			UpdatedAt:     formatTimestamp(r.UpdateTime),
+		})
+	}
+
+	return orders, nil
+}
+
 // sign creates a HMAC SHA256 signature.
 func (e *BinanceExchange) sign(payload string) string {
 	mac := hmac.New(sha256.New, []byte(e.apiSecret))
 	mac.Write([]byte(payload))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// Helper functions
+
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+func parseFloat(s string) float64 {
+	f, _ := strconv.ParseFloat(s, 64)
+	return f
+}
+
+func formatTimestamp(ms int64) string {
+	if ms == 0 {
+		return ""
+	}
+	return time.UnixMilli(ms).Format(time.RFC3339)
 }
