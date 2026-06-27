@@ -4,8 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Emqo/TradingAgent/config"
+	"github.com/Emqo/TradingAgent/internal/agent"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
 )
@@ -15,6 +20,12 @@ func main() {
 	cfg, err := config.Load("config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Parse interval
+	interval, err := time.ParseDuration(cfg.Agent.Interval)
+	if err != nil {
+		log.Fatalf("Invalid interval %q: %v", cfg.Agent.Interval, err)
 	}
 
 	// Get LLM provider config
@@ -30,8 +41,6 @@ func main() {
 		providerCfg.Model,
 	)
 
-	fmt.Printf("✅ LLM Provider: %s (model: %s)\n", llmProvider.Name(), providerCfg.Model)
-
 	// Create Binance exchange
 	exchangeProvider := exchange.NewBinanceExchange(
 		cfg.Binance.APIKey,
@@ -39,36 +48,39 @@ func main() {
 		cfg.Binance.Testnet,
 	)
 
-	fmt.Printf("✅ Exchange: %s (testnet: %v)\n", exchangeProvider.Name(), cfg.Binance.Testnet)
-	fmt.Println("---")
+	// Print startup info
+	fmt.Println("╔══════════════════════════════════════════╗")
+	fmt.Println("║         TradingAgent v0.1.0              ║")
+	fmt.Println("╚══════════════════════════════════════════╝")
+	fmt.Println()
+	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
+	fmt.Printf("  Exchange: %s (testnet: %v)\n", exchangeProvider.Name(), cfg.Binance.Testnet)
+	fmt.Printf("  Interval: %s\n", interval)
+	fmt.Println()
 
-	// Test Binance connection - get BTC price
-	ctx := context.Background()
-	ticker, err := exchangeProvider.GetTicker(ctx, "BTCUSDT")
-	if err != nil {
-		log.Fatalf("Failed to get ticker: %v", err)
+	// Create agent
+	tradingAgent := agent.New(llmProvider, exchangeProvider, agent.Config{
+		Interval:    interval,
+		MaxTokens:   cfg.Agent.MaxTokens,
+		Temperature: cfg.Agent.Temperature,
+	})
+
+	// Handle graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		log.Printf("Received signal %v, shutting down...", sig)
+		cancel()
+	}()
+
+	// Run agent
+	log.Println("Starting agent...")
+	if err := tradingAgent.Run(ctx); err != nil {
+		log.Fatalf("Agent error: %v", err)
 	}
-
-	fmt.Printf("📈 BTC/USDT Price: $%.2f\n", ticker.LastPrice)
-
-	// Test LLM with market data
-	messages := []llm.Message{
-		{
-			Role:    "system",
-			Content: "You are a crypto trading analyst. Analyze the market data and provide a brief assessment.",
-		},
-		{
-			Role:    "user",
-			Content: fmt.Sprintf("Current BTC price: $%.2f. Give a one-sentence market assessment.", ticker.LastPrice),
-		},
-	}
-
-	resp, err := llmProvider.Chat(ctx, messages, llm.WithMaxTokens(200))
-	if err != nil {
-		log.Fatalf("LLM call failed: %v", err)
-	}
-
-	fmt.Println("---")
-	fmt.Printf("🤖 LLM Analysis: %s\n", resp.Content)
-	fmt.Printf("📊 Token Usage: %d tokens\n", resp.TokenUsage.TotalTokens)
 }
