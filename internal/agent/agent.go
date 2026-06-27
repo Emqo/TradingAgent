@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/Emqo/TradingAgent/internal/arbitrage"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
 	"github.com/Emqo/TradingAgent/internal/tools"
@@ -14,10 +15,11 @@ import (
 
 // Agent represents the trading agent.
 type Agent struct {
-	llm      llm.Provider
-	exchange exchange.Exchange
-	registry *tools.Registry
-	config   Config
+	llm       llm.Provider
+	exchange  exchange.Exchange
+	registry  *tools.Registry
+	arbitrage *arbitrage.Manager
+	config    Config
 }
 
 // Config holds the agent configuration.
@@ -28,12 +30,19 @@ type Config struct {
 }
 
 // New creates a new Agent.
-func New(llmProvider llm.Provider, exchangeProvider exchange.Exchange, registry *tools.Registry, cfg Config) *Agent {
+func New(
+	llmProvider llm.Provider,
+	exchangeProvider exchange.Exchange,
+	registry *tools.Registry,
+	arbitrageManager *arbitrage.Manager,
+	cfg Config,
+) *Agent {
 	return &Agent{
-		llm:      llmProvider,
-		exchange: exchangeProvider,
-		registry: registry,
-		config:   cfg,
+		llm:       llmProvider,
+		exchange:  exchangeProvider,
+		registry:  registry,
+		arbitrage: arbitrageManager,
+		config:    cfg,
 	}
 }
 
@@ -75,14 +84,25 @@ func (a *Agent) decide(ctx context.Context) error {
 	}
 	log.Printf("   BTC: $%.2f", observation.BTCPrice)
 
-	// Step 2: Think - send to LLM with tools
+	// Step 2: Scan for arbitrage opportunities
+	log.Println("🔍 Scanning for arbitrage opportunities...")
+	arbResult, err := a.arbitrage.Scan(ctx)
+	if err != nil {
+		log.Printf("   ⚠️ Arbitrage scan error: %v", err)
+	} else {
+		log.Printf("   Found %d triangular, %d cash-and-carry opportunities",
+			len(arbResult.TriangularOpportunities),
+			len(arbResult.CashAndCarryOpportunities))
+	}
+
+	// Step 3: Think - send to LLM with tools
 	log.Println("🤔 Thinking...")
-	response, err := a.think(ctx, observation)
+	response, err := a.think(ctx, observation, arbResult)
 	if err != nil {
 		return fmt.Errorf("think: %w", err)
 	}
 
-	// Step 3: Handle tool calls if any
+	// Step 4: Handle tool calls if any
 	if len(response.ToolCalls) > 0 {
 		log.Printf("🔧 Executing %d tool calls...", len(response.ToolCalls))
 		if err := a.handleToolCalls(ctx, response.ToolCalls); err != nil {
@@ -90,7 +110,7 @@ func (a *Agent) decide(ctx context.Context) error {
 		}
 	}
 
-	// Step 4: Log the analysis
+	// Step 5: Log the analysis
 	if response.Content != "" {
 		log.Printf("   Analysis: %s", response.Content)
 	}
@@ -120,11 +140,30 @@ func (a *Agent) observe(ctx context.Context) (*Observation, error) {
 }
 
 // think sends the observation to the LLM for analysis.
-func (a *Agent) think(ctx context.Context, obs *Observation) (*llm.Response, error) {
+func (a *Agent) think(ctx context.Context, obs *Observation, arbResult *arbitrage.ScanResult) (*llm.Response, error) {
+	// Build arbitrage context
+	arbContext := ""
+	if arbResult != nil {
+		if len(arbResult.TriangularOpportunities) > 0 {
+			arbContext += "\n\nTriangular Arbitrage Opportunities:\n"
+			for _, opp := range arbResult.TriangularOpportunities {
+				arbContext += fmt.Sprintf("- %s: spread %.2f bps, profit $%.2f\n",
+					opp.Path.Name, opp.Spread, opp.Profit)
+			}
+		}
+		if len(arbResult.CashAndCarryOpportunities) > 0 {
+			arbContext += "\n\nCash-and-Carry Opportunities:\n"
+			for _, opp := range arbResult.CashAndCarryOpportunities {
+				arbContext += fmt.Sprintf("- %s: annualized %.2f%%, basis %.4f%%\n",
+					opp.Symbol, opp.AnnualizedYield, opp.BasisPercent)
+			}
+		}
+	}
+
 	messages := []llm.Message{
 		{
 			Role: "system",
-			Content: `You are a crypto trading analyst with access to market data tools.
+			Content: `You are a crypto trading analyst with access to market data tools and arbitrage detection.
 
 Your capabilities:
 - Get real-time prices for any trading pair
@@ -133,19 +172,19 @@ Your capabilities:
 - Detect arbitrage opportunities
 
 When analyzing the market:
-1. Use tools to gather additional data if needed
-2. Identify potential trading opportunities
-3. Assess risk factors
-4. Provide actionable recommendations
+1. Consider any detected arbitrage opportunities
+2. Assess risk factors
+3. Provide actionable recommendations
 
 Be concise and focused on actionable insights.`,
 		},
 		{
 			Role: "user",
 			Content: fmt.Sprintf(
-				"Current BTC/USDT price: $%.2f\nTime: %s\n\nAnalyze the market and identify any trading opportunities. Use tools if you need more data.",
+				"Current BTC/USDT price: $%.2f\nTime: %s%s\n\nAnalyze the market and identify any trading opportunities. Use tools if you need more data.",
 				obs.BTCPrice,
 				obs.Timestamp.Format(time.RFC3339),
+				arbContext,
 			),
 		},
 	}
