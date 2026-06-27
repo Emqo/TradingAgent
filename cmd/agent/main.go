@@ -15,6 +15,7 @@ import (
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
 	"github.com/Emqo/TradingAgent/internal/memory"
+	"github.com/Emqo/TradingAgent/internal/metrics"
 	"github.com/Emqo/TradingAgent/internal/risk"
 	"github.com/Emqo/TradingAgent/internal/strategy"
 	"github.com/Emqo/TradingAgent/internal/tools"
@@ -132,10 +133,21 @@ func main() {
 		},
 	)
 
+	// Create metrics
+	metricsInstance := metrics.NewMetrics()
+
+	// Start metrics server in background
+	go func() {
+		log.Println("📊 Starting metrics server on :9090...")
+		if err := metrics.StartMetricsServer(":9090"); err != nil {
+			log.Printf("⚠️ Metrics server error: %v", err)
+		}
+	}()
+
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
-	fmt.Println("║         TradingAgent v0.5.0              ║")
-	fmt.Println("║     Phase 5: Strategy & Memory           ║")
+	fmt.Println("║         TradingAgent v0.6.0              ║")
+	fmt.Println("║     Prometheus Monitoring                ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
@@ -151,6 +163,7 @@ func main() {
 		exchangeProvider,
 		registry,
 		arbitrageManager,
+		metricsInstance,
 		agent.Config{
 			Interval:    interval,
 			MaxTokens:   cfg.Agent.MaxTokens,

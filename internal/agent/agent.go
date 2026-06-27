@@ -10,6 +10,7 @@ import (
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
+	"github.com/Emqo/TradingAgent/internal/metrics"
 	"github.com/Emqo/TradingAgent/internal/tools"
 )
 
@@ -20,6 +21,7 @@ type Agent struct {
 	registry  *tools.Registry
 	arbitrage *arbitrage.Manager
 	session   *llm.Session
+	metrics   *metrics.Metrics
 	config    Config
 }
 
@@ -36,6 +38,7 @@ func New(
 	exchangeProvider exchange.Exchange,
 	registry *tools.Registry,
 	arbitrageManager *arbitrage.Manager,
+	metricsInstance *metrics.Metrics,
 	cfg Config,
 ) *Agent {
 	// Create session with system prompt
@@ -65,6 +68,7 @@ Be concise and focused on actionable insights.`
 		registry:  registry,
 		arbitrage: arbitrageManager,
 		session:   session,
+		metrics:   metricsInstance,
 		config:    cfg,
 	}
 }
@@ -116,14 +120,31 @@ func (a *Agent) decide(ctx context.Context) error {
 		log.Printf("   Found %d triangular, %d cash-and-carry opportunities",
 			len(arbResult.TriangularOpportunities),
 			len(arbResult.CashAndCarryOpportunities))
+
+		// Record arbitrage metrics
+		for _, opp := range arbResult.TriangularOpportunities {
+			a.metrics.RecordArbitrageOpportunity("triangular")
+			a.metrics.RecordArbitrageSpread("triangular", opp.Spread)
+		}
+		for range arbResult.CashAndCarryOpportunities {
+			a.metrics.RecordArbitrageOpportunity("cash_and_carry")
+		}
 	}
 
 	// Step 3: Think - send to LLM with tools
 	log.Println("🤔 Thinking...")
+	startTime := time.Now()
 	response, err := a.think(ctx, observation, arbResult)
+	llmLatency := time.Since(startTime).Seconds()
+
 	if err != nil {
+		a.metrics.RecordLLMCall(a.llm.Name(), "error")
 		return fmt.Errorf("think: %w", err)
 	}
+
+	a.metrics.RecordLLMCall(a.llm.Name(), "success")
+	a.metrics.RecordLLMLatency(a.llm.Name(), llmLatency)
+	a.metrics.RecordLLMTokens(a.llm.Name(), "total", response.TokenUsage.TotalTokens)
 
 	// Step 4: Handle tool calls if any
 	if len(response.ToolCalls) > 0 {
