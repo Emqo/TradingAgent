@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/Emqo/TradingAgent/internal/retry"
 )
 
 // BinanceExchange implements the Exchange interface for Binance.
@@ -20,6 +22,7 @@ type BinanceExchange struct {
 	apiSecret  string
 	baseURL    string
 	httpClient *http.Client
+	retryConfig retry.Config
 }
 
 // NewBinanceExchange creates a new Binance exchange client.
@@ -34,6 +37,12 @@ func NewBinanceExchange(apiKey, apiSecret string, testnet bool) *BinanceExchange
 		apiSecret:  apiSecret,
 		baseURL:    baseURL,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
+		retryConfig: retry.Config{
+			MaxRetries:        3,
+			InitialBackoff:    500 * time.Millisecond,
+			MaxBackoff:        5 * time.Second,
+			BackoffMultiplier: 2.0,
+		},
 	}
 }
 
@@ -45,28 +54,33 @@ func (e *BinanceExchange) Name() string {
 // GetTicker returns the current price for a trading pair.
 func (e *BinanceExchange) GetTicker(ctx context.Context, symbol string) (*Ticker, error) {
 	path := fmt.Sprintf("/api/v3/ticker/price?symbol=%s", symbol)
-	resp, err := e.doRequest(ctx, "GET", path, nil, false)
-	if err != nil {
-		return nil, err
-	}
 
-	var result struct {
-		Symbol string `json:"symbol"`
-		Price  string `json:"price"`
-	}
-	if err := json.Unmarshal(resp, &result); err != nil {
-		return nil, fmt.Errorf("parse ticker: %w", err)
-	}
+	result, err := retry.Do(ctx, e.retryConfig, func() (*Ticker, error) {
+		resp, err := e.doRequest(ctx, "GET", path, nil, false)
+		if err != nil {
+			return nil, err
+		}
 
-	price, err := strconv.ParseFloat(result.Price, 64)
-	if err != nil {
-		return nil, fmt.Errorf("parse price: %w", err)
-	}
+		var apiResult struct {
+			Symbol string `json:"symbol"`
+			Price  string `json:"price"`
+		}
+		if err := json.Unmarshal(resp, &apiResult); err != nil {
+			return nil, fmt.Errorf("parse ticker: %w", err)
+		}
 
-	return &Ticker{
-		Symbol:    symbol,
-		LastPrice: price,
-	}, nil
+		price, err := strconv.ParseFloat(apiResult.Price, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse price: %w", err)
+		}
+
+		return &Ticker{
+			Symbol:    symbol,
+			LastPrice: price,
+		}, nil
+	})
+
+	return result, err
 }
 
 // GetBalance returns the account balance.
