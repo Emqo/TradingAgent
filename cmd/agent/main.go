@@ -46,12 +46,13 @@ func main() {
 		providerCfg.Model,
 	)
 
-	// Create Binance exchange
-	exchangeProvider := exchange.NewBinanceExchange(
+	// Create Binance exchange (with caching)
+	binanceExchange := exchange.NewBinanceExchange(
 		cfg.Binance.APIKey,
 		cfg.Binance.APISecret,
 		cfg.Binance.Testnet,
 	)
+	exchangeProvider := exchange.NewCachedExchange(binanceExchange)
 
 	// Create memory manager
 	memoryManager := memory.NewManager(100, 1000) // 100 short-term, 1000 long-term

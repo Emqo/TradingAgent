@@ -19,6 +19,7 @@ type Agent struct {
 	exchange  exchange.Exchange
 	registry  *tools.Registry
 	arbitrage *arbitrage.Manager
+	session   *llm.Session
 	config    Config
 }
 
@@ -37,11 +38,33 @@ func New(
 	arbitrageManager *arbitrage.Manager,
 	cfg Config,
 ) *Agent {
+	// Create session with system prompt
+	systemPrompt := `You are a crypto trading analyst with access to market data tools and arbitrage detection.
+
+Your capabilities:
+- Get real-time prices for any trading pair
+- View order book depth
+- Check account balance
+- Detect arbitrage opportunities
+- Check risk status
+- Generate trading strategies
+- Manage memory
+
+When analyzing the market:
+1. Consider any detected arbitrage opportunities
+2. Assess risk factors
+3. Provide actionable recommendations
+
+Be concise and focused on actionable insights.`
+
+	session := llm.NewSession(systemPrompt, 20) // Keep last 20 messages
+
 	return &Agent{
 		llm:       llmProvider,
 		exchange:  exchangeProvider,
 		registry:  registry,
 		arbitrage: arbitrageManager,
+		session:   session,
 		config:    cfg,
 	}
 }
@@ -115,6 +138,19 @@ func (a *Agent) decide(ctx context.Context) error {
 		log.Printf("   Analysis: %s", response.Content)
 	}
 
+	// Step 6: Store decision in session
+	a.session.AddMessage(llm.Message{
+		Role:    "user",
+		Content: fmt.Sprintf("BTC: $%.2f, Arbitrage: %d triangular, %d cash-and-carry",
+			observation.BTCPrice,
+			len(arbResult.TriangularOpportunities),
+			len(arbResult.CashAndCarryOpportunities)),
+	})
+	a.session.AddMessage(llm.Message{
+		Role:    "assistant",
+		Content: response.Content,
+	})
+
 	log.Println("📝 Decision logged (no real trading yet)")
 
 	return nil
@@ -160,34 +196,21 @@ func (a *Agent) think(ctx context.Context, obs *Observation, arbResult *arbitrag
 		}
 	}
 
-	messages := []llm.Message{
-		{
-			Role: "system",
-			Content: `You are a crypto trading analyst with access to market data tools and arbitrage detection.
+	// Add user message to session
+	userMessage := fmt.Sprintf(
+		"Current BTC/USDT price: $%.2f\nTime: %s%s\n\nAnalyze the market and identify any trading opportunities. Use tools if you need more data.",
+		obs.BTCPrice,
+		obs.Timestamp.Format(time.RFC3339),
+		arbContext,
+	)
 
-Your capabilities:
-- Get real-time prices for any trading pair
-- View order book depth
-- Check account balance
-- Detect arbitrage opportunities
+	a.session.AddMessage(llm.Message{
+		Role:    "user",
+		Content: userMessage,
+	})
 
-When analyzing the market:
-1. Consider any detected arbitrage opportunities
-2. Assess risk factors
-3. Provide actionable recommendations
-
-Be concise and focused on actionable insights.`,
-		},
-		{
-			Role: "user",
-			Content: fmt.Sprintf(
-				"Current BTC/USDT price: $%.2f\nTime: %s%s\n\nAnalyze the market and identify any trading opportunities. Use tools if you need more data.",
-				obs.BTCPrice,
-				obs.Timestamp.Format(time.RFC3339),
-				arbContext,
-			),
-		},
-	}
+	// Get all messages from session
+	messages := a.session.GetMessages()
 
 	// Convert tools to LLM format
 	llmTools := a.registry.ToLLMTools()
