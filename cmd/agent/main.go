@@ -14,7 +14,9 @@ import (
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
+	"github.com/Emqo/TradingAgent/internal/memory"
 	"github.com/Emqo/TradingAgent/internal/risk"
+	"github.com/Emqo/TradingAgent/internal/strategy"
 	"github.com/Emqo/TradingAgent/internal/tools"
 )
 
@@ -51,21 +53,30 @@ func main() {
 		cfg.Binance.Testnet,
 	)
 
+	// Create memory manager
+	memoryManager := memory.NewManager(100, 1000) // 100 short-term, 1000 long-term
+
 	// Create risk manager
 	riskManager := risk.NewManager(risk.Config{
 		MaxPositionUSDT:       cfg.Risk.MaxPositionUSDT,
-		MaxTotalPositionUSDT:  cfg.Risk.MaxPositionUSDT * 5, // 5x single position
+		MaxTotalPositionUSDT:  cfg.Risk.MaxPositionUSDT * 5,
 		MaxDailyLossUSDT:      cfg.Risk.MaxDailyLossUSDT,
-		MaxDailyLossPercent:   10,  // 10% daily loss limit
+		MaxDailyLossPercent:   10,
 		MaxDrawdownPercent:    cfg.Risk.MaxDrawdownPct,
-		MaxLeverage:           3.0, // 3x max leverage
-		MaxExposurePerPairUSDT: cfg.Risk.MaxPositionUSDT * 2, // 2x single position per pair
+		MaxLeverage:           3.0,
+		MaxExposurePerPairUSDT: cfg.Risk.MaxPositionUSDT * 2,
 		CooldownAfterLoss:     5 * time.Minute,
 	})
 
 	// Add alert listener for logging
 	riskManager.AddListener(func(alert risk.Alert) {
 		log.Printf("🚨 Risk Alert [%s/%s]: %s", alert.Level, alert.Type, alert.Message)
+	})
+
+	// Create strategy engine
+	strategyEngine := strategy.NewEngine(llmProvider, memoryManager, strategy.Config{
+		StrategyTTL: 1 * time.Hour,
+		MaxTokens:   cfg.Agent.MaxTokens,
 	})
 
 	// Create tool registry and register tools
@@ -86,6 +97,14 @@ func main() {
 	// Risk tools
 	registry.Register(tools.NewCheckRiskTool(riskManager))
 	registry.Register(tools.NewGetRiskStatusTool(riskManager))
+
+	// Strategy tools
+	registry.Register(tools.NewGenerateStrategyTool(strategyEngine))
+	registry.Register(tools.NewGetStrategyStatusTool(strategyEngine))
+
+	// Memory tools
+	registry.Register(tools.NewAddMemoryTool(memoryManager))
+	registry.Register(tools.NewGetMemoryContextTool(memoryManager))
 
 	// Create arbitrage manager
 	arbitrageManager := arbitrage.NewManager(
@@ -112,21 +131,15 @@ func main() {
 
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
-	fmt.Println("║         TradingAgent v0.4.0              ║")
-	fmt.Println("║         Phase 4: Risk Management         ║")
+	fmt.Println("║         TradingAgent v0.5.0              ║")
+	fmt.Println("║     Phase 5: Strategy & Memory           ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
 	fmt.Printf("  Exchange: %s (testnet: %v)\n", exchangeProvider.Name(), cfg.Binance.Testnet)
 	fmt.Printf("  Interval: %s\n", interval)
 	fmt.Printf("  Tools:    %d registered\n", len(registry.List()))
-	fmt.Printf("  Arbitrage: Triangular + Cash-and-Carry\n")
-	fmt.Println()
-	fmt.Println("  Risk Limits:")
-	fmt.Printf("    Max Position:     $%.0f\n", cfg.Risk.MaxPositionUSDT)
-	fmt.Printf("    Max Daily Loss:   $%.0f\n", cfg.Risk.MaxDailyLossUSDT)
-	fmt.Printf("    Max Drawdown:     %.0f%%\n", cfg.Risk.MaxDrawdownPct)
-	fmt.Printf("    Max Leverage:     %.0fx\n", riskManager.GetState().PeakValue) // This is wrong, but just for display
+	fmt.Printf("  Memory:   Short-term: 100, Long-term: 1000\n")
 	fmt.Println()
 
 	// Create agent
