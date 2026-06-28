@@ -197,14 +197,14 @@ func (a *Agent) decide(ctx context.Context) error {
 		// Build detailed reason
 		reason := response.Content
 		if len(toolCallNames) > 0 {
-			reason += fmt.Sprintf("\n\nTools used: %v", toolCallNames)
+			reason += fmt.Sprintf("\n\n使用工具: %v", toolCallNames)
 		}
 
 		decision := &database.Decision{
 			Action:     action,
 			Symbol:     "BTCUSDT", // Primary symbol
 			Reason:     reason,
-			Result:     fmt.Sprintf("Analysis completed, %d tool calls", len(toolCallNames)),
+			Result:     fmt.Sprintf("分析完成，调用 %d 个工具", len(toolCallNames)),
 			TokensUsed: response.TokenUsage.TotalTokens,
 			LatencyMs:  int(llmLatency * 1000),
 		}
@@ -227,27 +227,27 @@ func (a *Agent) parseAction(content string, toolCalls []string) string {
 	for _, tool := range toolCalls {
 		switch tool {
 		case "place_order":
-			return "TRADE"
+			return "交易"
 		case "cancel_order":
-			return "CANCEL"
+			return "撤单"
 		case "check_risk":
-			return "RISK_CHECK"
+			return "风控检查"
 		}
 	}
 
 	// Parse content for action keywords
 	contentLower := content
 	if contains(contentLower, "buy") || contains(contentLower, "买入") || contains(contentLower, "long") {
-		return "BUY_SIGNAL"
+		return "买入信号"
 	}
 	if contains(contentLower, "sell") || contains(contentLower, "卖出") || contains(contentLower, "short") {
-		return "SELL_SIGNAL"
+		return "卖出信号"
 	}
 	if contains(contentLower, "hold") || contains(contentLower, "持有") || contains(contentLower, "wait") {
-		return "HOLD"
+		return "持有"
 	}
 
-	return "ANALYZE"
+	return "分析"
 }
 
 // contains checks if a string contains a substring (case-insensitive helper).
