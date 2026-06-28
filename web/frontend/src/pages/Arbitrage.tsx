@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   ArrowLeftRight,
   TrendingUp,
@@ -28,6 +29,8 @@ interface ArbitrageStats {
   success_rate: number;
 }
 
+const API_URL = '/api';
+
 export default function Arbitrage() {
   const [scanning, setScanning] = useState(true);
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
@@ -47,18 +50,17 @@ export default function Arbitrage() {
 
   const fetchArbitrageData = async () => {
     try {
-      // TODO: 替换为真实的 API 调用
-      // const res = await axios.get(`${API_URL}/arbitrage/opportunities`);
-      // setOpportunities(res.data.opportunities);
-      // setStats(res.data.stats);
+      // 获取套利机会
+      const oppRes = await axios.get(`${API_URL}/arbitrage/opportunities`);
+      setOpportunities(oppRes.data.opportunities || []);
 
-      // 临时：使用空数据
-      setOpportunities([]);
+      // 获取套利统计
+      const statsRes = await axios.get(`${API_URL}/arbitrage/stats`);
       setStats({
-        total_opportunities: 0,
-        total_profit: 0,
-        avg_spread: 0,
-        success_rate: 0,
+        total_opportunities: statsRes.data.total_opportunities || 0,
+        total_profit: statsRes.data.total_profit || 0,
+        avg_spread: statsRes.data.avg_spread || 0,
+        success_rate: statsRes.data.success_rate || 0,
       });
     } catch (err) {
       console.error('获取套利数据失败:', err);

@@ -26,6 +26,8 @@ type Server struct {
 	userStore  store.UserStoreInterface
 	authHandler *handlers.AuthHandler
 	dashboardHandler *handlers.DashboardHandler
+	arbitrageHandler *handlers.ArbitrageHandler
+	agentHandler *handlers.AgentHandler
 }
 
 // Config holds server configuration.
@@ -50,6 +52,8 @@ func NewServer(
 
 	// Create handlers
 	dashboardHandler := handlers.NewDashboardHandler(exchange, riskMgr, arbMgr, agent)
+	arbitrageHandler := handlers.NewArbitrageHandler(exchange, arbMgr)
+	agentHandler := handlers.NewAgentHandler()
 
 	// Create router
 	router := gin.Default()
@@ -69,6 +73,8 @@ func NewServer(
 		db:              db,
 		jwtAuth:         jwtAuth,
 		dashboardHandler: dashboardHandler,
+		arbitrageHandler: arbitrageHandler,
+		agentHandler:     agentHandler,
 	}
 
 	// Initialize user store
@@ -118,6 +124,14 @@ func (s *Server) setupRoutes() {
 		protected.GET("/dashboard/risk", s.dashboardHandler.GetRiskStatus)
 		protected.POST("/dashboard/pause", s.dashboardHandler.PauseTrading)
 		protected.POST("/dashboard/resume", s.dashboardHandler.ResumeTrading)
+
+		// Arbitrage
+		protected.GET("/arbitrage/opportunities", s.arbitrageHandler.GetOpportunities)
+		protected.GET("/arbitrage/stats", s.arbitrageHandler.GetStats)
+
+		// Agent
+		protected.GET("/agent/decisions", s.agentHandler.GetDecisions)
+		protected.GET("/agent/stats", s.agentHandler.GetStats)
 	}
 }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Bot,
   Brain,
@@ -34,6 +35,8 @@ interface AgentStats {
   tokens_used: number;
 }
 
+const API_URL = '/api';
+
 export default function Agent() {
   const [running, setRunning] = useState(true);
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -55,20 +58,19 @@ export default function Agent() {
 
   const fetchAgentData = async () => {
     try {
-      // TODO: 替换为真实的 API 调用
-      // const res = await axios.get(`${API_URL}/agent/decisions`);
-      // setDecisions(res.data.decisions);
-      // setStats(res.data.stats);
+      // 获取决策日志
+      const decisionsRes = await axios.get(`${API_URL}/agent/decisions`);
+      setDecisions(decisionsRes.data.decisions || []);
 
-      // 临时：使用空数据
-      setDecisions([]);
+      // 获取 Agent 统计
+      const statsRes = await axios.get(`${API_URL}/agent/stats`);
       setStats({
-        today_decisions: 0,
-        today_trades: 0,
-        today_pnl: 0,
-        win_rate: 0,
-        llm_calls: 0,
-        tokens_used: 0,
+        today_decisions: statsRes.data.today_decisions || 0,
+        today_trades: statsRes.data.today_trades || 0,
+        today_pnl: statsRes.data.today_pnl || 0,
+        win_rate: statsRes.data.win_rate || 0,
+        llm_calls: statsRes.data.llm_calls || 0,
+        tokens_used: statsRes.data.tokens_used || 0,
       });
     } catch (err) {
       console.error('获取 Agent 数据失败:', err);
