@@ -143,6 +143,24 @@ func main() {
 		},
 	)
 
+	// Create arbitrage detector (fast, background scanning)
+	arbitrageDetector := arbitrage.NewDetector(
+		exchangeProvider,
+		arbitrage.DetectorConfig{
+			ScanInterval:       10 * time.Second,
+			MinSpreadBps:       15,
+			EnableTriangular:   true,
+			EnableCashAndCarry: true,
+		},
+	)
+
+	// Start arbitrage detector in background
+	go arbitrageDetector.Start(context.Background())
+
+	// Register arbitrage tools
+	registry.Register(tools.NewGetArbitrageOpportunitiesTool(arbitrageManager))
+	registry.Register(tools.NewExecuteArbitrageTool(exchangeProvider, arbitrageManager))
+
 	// Create logger
 	logLevel := logger.LevelInfo
 	log := logger.New(logLevel, os.Stdout)
