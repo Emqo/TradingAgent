@@ -216,6 +216,16 @@ func (a *TradingAgent) decide(ctx context.Context) error {
 			reason = "市场分析完成"
 		}
 
+		// Add market context
+		reason += fmt.Sprintf("\n\n市场数据:")
+		reason += fmt.Sprintf("\n- BTC: $%.2f", observation.BTCPrice)
+		if len(arbResult.TriangularOpportunities) > 0 {
+			reason += fmt.Sprintf("\n- 三角套利机会: %d 个", len(arbResult.TriangularOpportunities))
+		}
+		if len(arbResult.CashAndCarryOpportunities) > 0 {
+			reason += fmt.Sprintf("\n- 期现套利机会: %d 个", len(arbResult.CashAndCarryOpportunities))
+		}
+
 		decision := &database.Decision{
 			Action:     action,
 			Symbol:     "BTCUSDT", // Primary symbol

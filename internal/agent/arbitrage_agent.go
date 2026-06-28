@@ -190,6 +190,17 @@ func (a *ArbitrageAgent) decide(ctx context.Context) error {
 			reason = "套利分析完成"
 		}
 
+		// Add arbitrage opportunity details
+		if totalOpportunities > 0 {
+			reason += fmt.Sprintf("\n\n发现 %d 个套利机会:", totalOpportunities)
+			for _, opp := range arbResult.TriangularOpportunities {
+				reason += fmt.Sprintf("\n- %s: 价差 %.2f bps", opp.Path.Name, opp.Spread)
+			}
+			for _, opp := range arbResult.CashAndCarryOpportunities {
+				reason += fmt.Sprintf("\n- %s: 年化 %.2f%%", opp.Symbol, opp.AnnualizedYield)
+			}
+		}
+
 		decision := &database.Decision{
 			Action:     action,
 			Symbol:     "ARBITRAGE",
