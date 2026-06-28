@@ -160,19 +160,26 @@ func (a *Agent) decide(ctx context.Context) error {
 	}).Info("LLM response received")
 
 	// Step 4: Handle tool calls if any
+	toolCallNames := make([]string, 0)
 	if len(response.ToolCalls) > 0 {
 		a.logger.WithField("count", len(response.ToolCalls)).Info("Executing tool calls")
+		for _, tc := range response.ToolCalls {
+			toolCallNames = append(toolCallNames, tc.Name)
+		}
 		if err := a.handleToolCalls(ctx, response.ToolCalls); err != nil {
 			return fmt.Errorf("handle tool calls: %w", err)
 		}
 	}
 
-	// Step 5: Log the analysis
+	// Step 5: Parse action from LLM response
+	action := a.parseAction(response.Content, toolCallNames)
+
+	// Step 6: Log the analysis
 	if response.Content != "" {
 		a.logger.WithField("analysis", response.Content).Info("Analysis completed")
 	}
 
-	// Step 6: Store decision in session
+	// Step 7: Store decision in session
 	a.session.AddMessage(llm.Message{
 		Role: "user",
 		Content: fmt.Sprintf("BTC: $%.2f, Arbitrage: %d triangular, %d cash-and-carry",
@@ -185,12 +192,19 @@ func (a *Agent) decide(ctx context.Context) error {
 		Content: response.Content,
 	})
 
-	// Step 7: Store decision in database
+	// Step 8: Store decision in database
 	if a.db != nil {
+		// Build detailed reason
+		reason := response.Content
+		if len(toolCallNames) > 0 {
+			reason += fmt.Sprintf("\n\nTools used: %v", toolCallNames)
+		}
+
 		decision := &database.Decision{
-			Action:     "ANALYZE",
-			Reason:     response.Content,
-			Result:     "Analysis completed",
+			Action:     action,
+			Symbol:     "BTCUSDT", // Primary symbol
+			Reason:     reason,
+			Result:     fmt.Sprintf("Analysis completed, %d tool calls", len(toolCallNames)),
 			TokensUsed: response.TokenUsage.TotalTokens,
 			LatencyMs:  int(llmLatency * 1000),
 		}
@@ -205,6 +219,49 @@ func (a *Agent) decide(ctx context.Context) error {
 	a.logger.Info("Decision logged")
 
 	return nil
+}
+
+// parseAction parses the action from the LLM response.
+func (a *Agent) parseAction(content string, toolCalls []string) string {
+	// Check if any order tools were called
+	for _, tool := range toolCalls {
+		switch tool {
+		case "place_order":
+			return "TRADE"
+		case "cancel_order":
+			return "CANCEL"
+		case "check_risk":
+			return "RISK_CHECK"
+		}
+	}
+
+	// Parse content for action keywords
+	contentLower := content
+	if contains(contentLower, "buy") || contains(contentLower, "买入") || contains(contentLower, "long") {
+		return "BUY_SIGNAL"
+	}
+	if contains(contentLower, "sell") || contains(contentLower, "卖出") || contains(contentLower, "short") {
+		return "SELL_SIGNAL"
+	}
+	if contains(contentLower, "hold") || contains(contentLower, "持有") || contains(contentLower, "wait") {
+		return "HOLD"
+	}
+
+	return "ANALYZE"
+}
+
+// contains checks if a string contains a substring (case-insensitive helper).
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))
+}
+
+func containsSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // Observation holds the market data observed.
