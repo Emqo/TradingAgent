@@ -91,34 +91,43 @@ func main() {
 		MaxTokens:   cfg.Agent.MaxTokens,
 	})
 
-	// Create tool registry and register tools
-	registry := tools.NewRegistry()
+	// Create trading agent tool registry
+	tradingRegistry := tools.NewRegistry()
 
 	// Market data tools
-	registry.Register(tools.NewGetTickerTool(exchangeProvider))
-	registry.Register(tools.NewGetOrderBookTool(exchangeProvider))
-	registry.Register(tools.NewGetBalanceTool(exchangeProvider))
+	tradingRegistry.Register(tools.NewGetTickerTool(exchangeProvider))
+	tradingRegistry.Register(tools.NewGetOrderBookTool(exchangeProvider))
+	tradingRegistry.Register(tools.NewGetBalanceTool(exchangeProvider))
 
 	// Order tools
-	registry.Register(tools.NewPlaceOrderTool(exchangeProvider))
-	registry.Register(tools.NewGetOrderStatusTool(exchangeProvider))
-	registry.Register(tools.NewCancelOrderTool(exchangeProvider))
-	registry.Register(tools.NewGetOpenOrdersTool(exchangeProvider))
-
-	// Arbitrage tools
-	registry.Register(tools.NewDetectArbitrageTool(exchangeProvider))
+	tradingRegistry.Register(tools.NewPlaceOrderTool(exchangeProvider))
+	tradingRegistry.Register(tools.NewGetOrderStatusTool(exchangeProvider))
+	tradingRegistry.Register(tools.NewCancelOrderTool(exchangeProvider))
+	tradingRegistry.Register(tools.NewGetOpenOrdersTool(exchangeProvider))
 
 	// Risk tools
-	registry.Register(tools.NewCheckRiskTool(riskManager))
-	registry.Register(tools.NewGetRiskStatusTool(riskManager))
+	tradingRegistry.Register(tools.NewCheckRiskTool(riskManager))
+	tradingRegistry.Register(tools.NewGetRiskStatusTool(riskManager))
 
 	// Strategy tools
-	registry.Register(tools.NewGenerateStrategyTool(strategyEngine))
-	registry.Register(tools.NewGetStrategyStatusTool(strategyEngine))
+	tradingRegistry.Register(tools.NewGenerateStrategyTool(strategyEngine))
+	tradingRegistry.Register(tools.NewGetStrategyStatusTool(strategyEngine))
 
 	// Memory tools
-	registry.Register(tools.NewAddMemoryTool(memoryManager))
-	registry.Register(tools.NewGetMemoryContextTool(memoryManager))
+	tradingRegistry.Register(tools.NewAddMemoryTool(memoryManager))
+	tradingRegistry.Register(tools.NewGetMemoryContextTool(memoryManager))
+
+	// Create arbitrage agent tool registry
+	arbitrageRegistry := tools.NewRegistry()
+
+	// Market data tools
+	arbitrageRegistry.Register(tools.NewGetTickerTool(exchangeProvider))
+	arbitrageRegistry.Register(tools.NewGetOrderBookTool(exchangeProvider))
+	arbitrageRegistry.Register(tools.NewGetBalanceTool(exchangeProvider))
+
+	// Risk tools
+	arbitrageRegistry.Register(tools.NewCheckRiskTool(riskManager))
+	arbitrageRegistry.Register(tools.NewGetRiskStatusTool(riskManager))
 
 	// Create arbitrage manager
 	arbitrageManager := arbitrage.NewManager(
@@ -157,9 +166,9 @@ func main() {
 	// Start arbitrage detector in background
 	go arbitrageDetector.Start(context.Background())
 
-	// Register arbitrage tools
-	registry.Register(tools.NewGetArbitrageOpportunitiesTool(arbitrageManager))
-	registry.Register(tools.NewExecuteArbitrageTool(exchangeProvider, arbitrageManager))
+	// Register arbitrage tools to arbitrage registry
+	arbitrageRegistry.Register(tools.NewGetArbitrageOpportunitiesTool(arbitrageManager))
+	arbitrageRegistry.Register(tools.NewExecuteArbitrageTool(exchangeProvider, arbitrageManager))
 
 	// Create logger
 	logLevel := logger.LevelInfo
@@ -230,7 +239,7 @@ func main() {
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
 	fmt.Printf("  Exchange: %s (testnet: %v)\n", exchangeProvider.Name(), cfg.Binance.Testnet)
 	fmt.Printf("  Interval: %s\n", interval)
-	fmt.Printf("  Tools:    %d registered\n", len(registry.List()))
+	fmt.Printf("  Tools:    %d registered (trading), %d registered (arbitrage)\n", len(tradingRegistry.List()), len(arbitrageRegistry.List()))
 	fmt.Printf("  Memory:   Short-term: 100, Long-term: 1000\n")
 	fmt.Printf("  Logging:  JSON structured\n")
 	fmt.Printf("  Database: %s\n", map[bool]string{true: "Connected", false: "Not connected"}[db != nil])
@@ -242,7 +251,7 @@ func main() {
 	tradingAgent := agent.NewTradingAgent(
 		llmProvider,
 		exchangeProvider,
-		registry,
+		tradingRegistry,
 		arbitrageManager,
 		metricsInstance,
 		log,
@@ -258,7 +267,7 @@ func main() {
 	arbitrageAgent := agent.NewArbitrageAgent(
 		llmProvider,
 		exchangeProvider,
-		registry,
+		arbitrageRegistry,
 		arbitrageManager,
 		metricsInstance,
 		log,

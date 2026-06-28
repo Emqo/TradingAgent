@@ -124,31 +124,11 @@ func (a *TradingAgent) decide(ctx context.Context) error {
 	}
 	a.logger.WithField("btc_price", observation.BTCPrice).Info("Market data observed")
 
-	// Step 2: Scan for arbitrage opportunities
-	a.logger.Debug("Scanning for arbitrage opportunities")
-	arbResult, err := a.arbitrage.Scan(ctx)
-	if err != nil {
-		a.logger.Warnf("Arbitrage scan error: %v", err)
-	} else {
-		a.logger.WithFields(map[string]any{
-			"triangular":    len(arbResult.TriangularOpportunities),
-			"cash_and_carry": len(arbResult.CashAndCarryOpportunities),
-		}).Info("Arbitrage scan completed")
-
-		// Record arbitrage metrics
-		for _, opp := range arbResult.TriangularOpportunities {
-			a.metrics.RecordArbitrageOpportunity("triangular")
-			a.metrics.RecordArbitrageSpread("triangular", opp.Spread)
-		}
-		for range arbResult.CashAndCarryOpportunities {
-			a.metrics.RecordArbitrageOpportunity("cash_and_carry")
-		}
-	}
-
-	// Step 3: Think - send to LLM with tools
+	// Step 2: Think - send to LLM with tools
+	// Note: TradingAgent focuses on market analysis and trading decisions
 	a.logger.Debug("Thinking")
 	startTime := time.Now()
-	response, err := a.think(ctx, observation, arbResult)
+	response, err := a.think(ctx, observation)
 	llmLatency := time.Since(startTime).Seconds()
 
 	if err != nil {
@@ -189,10 +169,8 @@ func (a *TradingAgent) decide(ctx context.Context) error {
 	// Step 7: Store decision in session
 	a.session.AddMessage(llm.Message{
 		Role: "user",
-		Content: fmt.Sprintf("BTC: $%.2f, Arbitrage: %d triangular, %d cash-and-carry",
-			observation.BTCPrice,
-			len(arbResult.TriangularOpportunities),
-			len(arbResult.CashAndCarryOpportunities)),
+		Content: fmt.Sprintf("BTC: $%.2f, 请分析市场并做出交易决策",
+			observation.BTCPrice),
 	})
 	a.session.AddMessage(llm.Message{
 		Role:    "assistant",
@@ -219,12 +197,6 @@ func (a *TradingAgent) decide(ctx context.Context) error {
 		// Add market context
 		reason += fmt.Sprintf("\n\n市场数据:")
 		reason += fmt.Sprintf("\n- BTC: $%.2f", observation.BTCPrice)
-		if len(arbResult.TriangularOpportunities) > 0 {
-			reason += fmt.Sprintf("\n- 三角套利机会: %d 个", len(arbResult.TriangularOpportunities))
-		}
-		if len(arbResult.CashAndCarryOpportunities) > 0 {
-			reason += fmt.Sprintf("\n- 期现套利机会: %d 个", len(arbResult.CashAndCarryOpportunities))
-		}
 
 		decision := &database.Decision{
 			Action:     action,
@@ -310,32 +282,12 @@ func (a *TradingAgent) observe(ctx context.Context) (*Observation, error) {
 }
 
 // think sends the observation to the LLM for analysis.
-func (a *TradingAgent) think(ctx context.Context, obs *Observation, arbResult *arbitrage.ScanResult) (*llm.Response, error) {
-	// Build arbitrage context
-	arbContext := ""
-	if arbResult != nil {
-		if len(arbResult.TriangularOpportunities) > 0 {
-			arbContext += "\n\nTriangular Arbitrage Opportunities:\n"
-			for _, opp := range arbResult.TriangularOpportunities {
-				arbContext += fmt.Sprintf("- %s: spread %.2f bps, profit $%.2f\n",
-					opp.Path.Name, opp.Spread, opp.Profit)
-			}
-		}
-		if len(arbResult.CashAndCarryOpportunities) > 0 {
-			arbContext += "\n\nCash-and-Carry Opportunities:\n"
-			for _, opp := range arbResult.CashAndCarryOpportunities {
-				arbContext += fmt.Sprintf("- %s: annualized %.2f%%, basis %.4f%%\n",
-					opp.Symbol, opp.AnnualizedYield, opp.BasisPercent)
-			}
-		}
-	}
-
+func (a *TradingAgent) think(ctx context.Context, obs *Observation) (*llm.Response, error) {
 	// Add user message to session
 	userMessage := fmt.Sprintf(
-		"Current BTC/USDT price: $%.2f\nTime: %s%s\n\nAnalyze the market and identify any trading opportunities. Use tools if you need more data.",
+		"当前 BTC/USDT 价格: $%.2f\n时间: %s\n\n请分析市场并做出交易决策。使用工具获取更多数据。",
 		obs.BTCPrice,
 		obs.Timestamp.Format(time.RFC3339),
-		arbContext,
 	)
 
 	a.session.AddMessage(llm.Message{
