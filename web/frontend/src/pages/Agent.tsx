@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Bot,
   Brain,
@@ -25,40 +25,65 @@ interface Decision {
   pnl: number;
 }
 
+interface AgentStats {
+  today_decisions: number;
+  today_trades: number;
+  today_pnl: number;
+  win_rate: number;
+  llm_calls: number;
+  tokens_used: number;
+}
+
 export default function Agent() {
   const [running, setRunning] = useState(true);
-  const [decisions] = useState<Decision[]>([
-    {
-      time: '2026-06-28T14:30:25+08:00',
-      action: '买入 BTCUSDT',
-      reason: 'BTC 在 $60,500 形成支撑，RSI 超卖，预计反弹',
-      result: '成功买入 0.1 BTC @ $60,500',
-      pnl: 0,
-    },
-    {
-      time: '2026-06-28T14:25:10+08:00',
-      action: '卖出 ETHUSDT',
-      reason: 'ETH 触及阻力位 $1,600，获利了结',
-      result: '成功卖出 1.5 ETH @ $1,595',
-      pnl: 85,
-    },
-    {
-      time: '2026-06-28T14:20:05+08:00',
-      action: '持有',
-      reason: '市场震荡，等待明确信号',
-      result: '无操作',
-      pnl: 0,
-    },
-  ]);
-
-  const [stats] = useState({
-    today_decisions: 24,
-    today_trades: 8,
-    today_pnl: 185,
-    win_rate: 62,
-    llm_calls: 48,
-    tokens_used: 125000,
+  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [stats, setStats] = useState<AgentStats>({
+    today_decisions: 0,
+    today_trades: 0,
+    today_pnl: 0,
+    win_rate: 0,
+    llm_calls: 0,
+    tokens_used: 0,
   });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAgentData();
+    const interval = setInterval(fetchAgentData, 10000); // 每 10 秒刷新
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchAgentData = async () => {
+    try {
+      // TODO: 替换为真实的 API 调用
+      // const res = await axios.get(`${API_URL}/agent/decisions`);
+      // setDecisions(res.data.decisions);
+      // setStats(res.data.stats);
+
+      // 临时：使用空数据
+      setDecisions([]);
+      setStats({
+        today_decisions: 0,
+        today_trades: 0,
+        today_pnl: 0,
+        win_rate: 0,
+        llm_calls: 0,
+        tokens_used: 0,
+      });
+    } catch (err) {
+      console.error('获取 Agent 数据失败:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -119,7 +144,9 @@ export default function Agent() {
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">+${stats.today_pnl}</div>
+            <div className={`text-2xl font-bold ${stats.today_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {stats.today_pnl >= 0 ? '+' : ''}${stats.today_pnl.toFixed(2)}
+            </div>
             <p className="text-xs text-muted-foreground">Agent 交易收益</p>
           </CardContent>
         </Card>
@@ -175,7 +202,7 @@ export default function Agent() {
             <Separator />
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">当前持仓</span>
-              <span className="font-medium">3 个</span>
+              <span className="font-medium">-</span>
             </div>
           </CardContent>
         </Card>
@@ -188,34 +215,42 @@ export default function Agent() {
                 <MessageSquare className="h-5 w-5 text-blue-500" />
                 <CardTitle>决策日志</CardTitle>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={fetchAgentData}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 刷新
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {decisions.map((decision, i) => (
-                <div key={i} className="p-4 rounded-lg border">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={decision.pnl > 0 ? 'default' : decision.pnl < 0 ? 'destructive' : 'secondary'}>
-                        {decision.action}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">{formatLocalTimeShort(decision.time)}</span>
+            {decisions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                暂无决策记录
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {decisions.map((decision, i) => (
+                  <div key={i} className="p-4 rounded-lg border">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={decision.pnl > 0 ? 'default' : decision.pnl < 0 ? 'destructive' : 'secondary'}>
+                          {decision.action}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {formatLocalTimeShort(decision.time)}
+                        </span>
+                      </div>
+                      {decision.pnl !== 0 && (
+                        <span className={`font-medium ${decision.pnl > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {decision.pnl > 0 ? '+' : ''}${decision.pnl}
+                        </span>
+                      )}
                     </div>
-                    {decision.pnl !== 0 && (
-                      <span className={`font-medium ${decision.pnl > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {decision.pnl > 0 ? '+' : ''}${decision.pnl}
-                      </span>
-                    )}
+                    <p className="text-sm mb-2">{decision.reason}</p>
+                    <p className="text-sm text-muted-foreground">{decision.result}</p>
                   </div>
-                  <p className="text-sm mb-2">{decision.reason}</p>
-                  <p className="text-sm text-muted-foreground">{decision.result}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -231,22 +266,8 @@ export default function Agent() {
         <CardContent>
           <Textarea
             readOnly
-            value={`当前市场分析：
-
-BTC 在 $60,500 附近形成强支撑，4 小时图显示 RSI 从超卖区域反弹。成交量略有放大，显示买盘介入。
-
-ETH 走势相对强势，ETH/BTC 比率上升，显示资金从 BTC 流向 ETH。
-
-建议操作：
-1. BTCUSDT：在 $60,500 附近买入，止损 $59,800，目标 $62,000
-2. ETHUSDT：持有现有仓位，等待突破 $1,600
-
-风险提示：
-- 美联储议息会议临近，市场波动可能加大
-- 注意控制仓位，单笔不超过总资产的 10%
-
-[决策时间: 2026-06-28 14:30:25]`}
-            className="min-h-[200px] font-mono text-sm"
+            value="等待 Agent 开始决策..."
+            className="min-h-[100px] font-mono text-sm"
           />
         </CardContent>
       </Card>

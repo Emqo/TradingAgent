@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeftRight,
   TrendingUp,
@@ -21,21 +21,59 @@ interface ArbitrageOpportunity {
   timestamp: string;
 }
 
+interface ArbitrageStats {
+  total_opportunities: number;
+  total_profit: number;
+  avg_spread: number;
+  success_rate: number;
+}
+
 export default function Arbitrage() {
   const [scanning, setScanning] = useState(true);
-  const [opportunities] = useState<ArbitrageOpportunity[]>([
-    { type: '三角套利', path: 'USDT→BTC→ETH→USDT', spread_bps: 18.5, profit_usdt: 12.50, timestamp: '2026-06-28T14:30:25+08:00' },
-    { type: '三角套利', path: 'USDT→ETH→SOL→USDT', spread_bps: 15.2, profit_usdt: 8.30, timestamp: '2026-06-28T14:28:10+08:00' },
-    { type: '期现套利', path: 'BTC 永续合约', spread_bps: 0, profit_usdt: 45.00, timestamp: '2026-06-28T14:00:00+08:00' },
-    { type: '期现套利', path: 'ETH 永续合约', spread_bps: 0, profit_usdt: 32.00, timestamp: '2026-06-28T14:00:00+08:00' },
-  ]);
-
-  const [stats] = useState({
-    total_opportunities: 4,
-    total_profit: 97.80,
-    avg_spread: 16.85,
-    success_rate: 85,
+  const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
+  const [stats, setStats] = useState<ArbitrageStats>({
+    total_opportunities: 0,
+    total_profit: 0,
+    avg_spread: 0,
+    success_rate: 0,
   });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchArbitrageData();
+    const interval = setInterval(fetchArbitrageData, 10000); // 每 10 秒刷新
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchArbitrageData = async () => {
+    try {
+      // TODO: 替换为真实的 API 调用
+      // const res = await axios.get(`${API_URL}/arbitrage/opportunities`);
+      // setOpportunities(res.data.opportunities);
+      // setStats(res.data.stats);
+
+      // 临时：使用空数据
+      setOpportunities([]);
+      setStats({
+        total_opportunities: 0,
+        total_profit: 0,
+        avg_spread: 0,
+        success_rate: 0,
+      });
+    } catch (err) {
+      console.error('获取套利数据失败:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -63,7 +101,7 @@ export default function Arbitrage() {
               </>
             )}
           </Button>
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" onClick={fetchArbitrageData}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -88,7 +126,7 @@ export default function Arbitrage() {
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">+${stats.total_profit}</div>
+            <div className="text-2xl font-bold text-green-500">+${stats.total_profit.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">套利收益</p>
           </CardContent>
         </Card>
@@ -99,7 +137,7 @@ export default function Arbitrage() {
             <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avg_spread} bps</div>
+            <div className="text-2xl font-bold">{stats.avg_spread.toFixed(1)} bps</div>
             <p className="text-xs text-muted-foreground">基点</p>
           </CardContent>
         </Card>
@@ -132,33 +170,41 @@ export default function Arbitrage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {opportunities
-                .filter(o => o.type === '三角套利')
-                .map((opp, i) => (
-                  <div key={i} className="p-4 rounded-lg border bg-muted/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">{opp.path}</span>
-                      <span className="text-sm text-muted-foreground">{formatLocalTimeShort(opp.timestamp)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">价差</p>
-                          <p className="font-medium">{opp.spread_bps} bps</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">预计收益</p>
-                          <p className="font-medium text-green-500">+${opp.profit_usdt}</p>
-                        </div>
+            {opportunities.filter(o => o.type === '三角套利').length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                暂无套利机会
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {opportunities
+                  .filter(o => o.type === '三角套利')
+                  .map((opp, i) => (
+                    <div key={i} className="p-4 rounded-lg border bg-muted/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{opp.path}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {formatLocalTimeShort(opp.timestamp)}
+                        </span>
                       </div>
-                      <Button size="sm" variant="outline">
-                        执行
-                      </Button>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">价差</p>
+                            <p className="font-medium">{opp.spread_bps} bps</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">预计收益</p>
+                            <p className="font-medium text-green-500">+${opp.profit_usdt}</p>
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline">
+                          执行
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -176,37 +222,45 @@ export default function Arbitrage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {opportunities
-                .filter(o => o.type === '期现套利')
-                .map((opp, i) => (
-                  <div key={i} className="p-4 rounded-lg border bg-muted/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">{opp.path}</span>
-                      <span className="text-sm text-muted-foreground">{formatLocalTimeShort(opp.timestamp)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">资金费率</p>
-                          <p className="font-medium">0.01%</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">年化收益</p>
-                          <p className="font-medium text-green-500">10.95%</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">今日收益</p>
-                          <p className="font-medium text-green-500">+${opp.profit_usdt}</p>
-                        </div>
+            {opportunities.filter(o => o.type === '期现套利').length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                暂无套利机会
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {opportunities
+                  .filter(o => o.type === '期现套利')
+                  .map((opp, i) => (
+                    <div key={i} className="p-4 rounded-lg border bg-muted/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{opp.path}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {formatLocalTimeShort(opp.timestamp)}
+                        </span>
                       </div>
-                      <Button size="sm" variant="outline">
-                        详情
-                      </Button>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">资金费率</p>
+                            <p className="font-medium">0.01%</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">年化收益</p>
+                            <p className="font-medium text-green-500">10.95%</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">今日收益</p>
+                            <p className="font-medium text-green-500">+${opp.profit_usdt}</p>
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline">
+                          详情
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
