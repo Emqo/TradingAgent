@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import {
   Bot,
   Play,
@@ -22,13 +23,76 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { formatLocalTimeShort } from '@/lib/utils';
 
-const performanceData: { date: string; value: number }[] = [];
+const API_URL = '/api';
 
-const decisions: { time: string; action: string; reason: string; pnl: string; positive: boolean }[] = [];
+interface BacktestResult {
+  result: {
+    total_return: number;
+    total_return_pct: number;
+    sharpe_ratio: number;
+    max_drawdown: number;
+    max_drawdown_pct: number;
+    win_rate: number;
+    total_trades: number;
+    winning_trades: number;
+    losing_trades: number;
+    profit_factor: number;
+    avg_trade_pnl: number;
+  };
+  trades: Array<{
+    time: string;
+    symbol: string;
+    side: string;
+    price: number;
+    quantity: number;
+    pnl: number;
+    running_pnl: number;
+  }>;
+}
 
 export default function AgentBacktest() {
   const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<BacktestResult | null>(null);
+  const [error, setError] = useState('');
+
+  const [config, setConfig] = useState({
+    strategy: 'agent',
+    symbol: 'BTCUSDT',
+    start_time: '2024-01-01',
+    end_time: '2024-01-07',
+    initial_usdt: 10000,
+  });
+
+  const runBacktest = async () => {
+    setRunning(true);
+    setError('');
+    setResult(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('请先登录');
+        return;
+      }
+
+      const res = await axios.post(`${API_URL}/backtest/run`, config, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setResult(res.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || '回测失败');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const chartData = result?.trades?.map(t => ({
+    time: t.time,
+    value: 10000 + t.running_pnl,
+  })) || [];
 
   return (
     <div className="space-y-6">
@@ -48,37 +112,59 @@ export default function AgentBacktest() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>LLM 模型</Label>
-              <Input defaultValue="mimo-v2.5-pro" />
+              <Label>策略</Label>
+              <select
+                className="w-full px-3 py-2 bg-background border rounded-md"
+                value={config.strategy}
+                onChange={(e) => setConfig({ ...config, strategy: e.target.value })}
+              >
+                <option value="agent">Agent 交易</option>
+                <option value="triangular">三角套利</option>
+                <option value="cash_and_carry">期现套利</option>
+              </select>
             </div>
             <div className="space-y-2">
               <Label>交易对</Label>
-              <Input defaultValue="BTCUSDT, ETHUSDT, SOLUSDT" />
+              <Input
+                value={config.symbol}
+                onChange={(e) => setConfig({ ...config, symbol: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label>开始日期</Label>
-              <Input type="date" defaultValue="2024-01-01" />
+              <Input
+                type="date"
+                value={config.start_time}
+                onChange={(e) => setConfig({ ...config, start_time: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label>结束日期</Label>
-              <Input type="date" defaultValue="2024-12-31" />
+              <Input
+                type="date"
+                value={config.end_time}
+                onChange={(e) => setConfig({ ...config, end_time: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label>初始资金 (USDT)</Label>
-              <Input type="number" defaultValue={10000} />
+              <Input
+                type="number"
+                value={config.initial_usdt}
+                onChange={(e) => setConfig({ ...config, initial_usdt: Number(e.target.value) })}
+              />
             </div>
-            <div className="space-y-2">
-              <Label>决策周期</Label>
-              <Input defaultValue="1 分钟" />
-            </div>
-            <div className="space-y-2">
-              <Label>最大 Token 数</Label>
-              <Input type="number" defaultValue={4096} />
-            </div>
+
+            {error && (
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                {error}
+              </div>
+            )}
+
             <Button
-              onClick={() => setRunning(!running)}
+              onClick={runBacktest}
+              disabled={running}
               className="w-full"
-              variant={running ? 'destructive' : 'default'}
             >
               {running ? (
                 <>
@@ -105,7 +191,9 @@ export default function AgentBacktest() {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground">--</div>
+                <div className={`text-2xl font-bold ${result ? (result.result.total_return >= 0 ? 'text-green-500' : 'text-red-500') : 'text-muted-foreground'}`}>
+                  {result ? `${result.result.total_return >= 0 ? '+' : ''}${result.result.total_return_pct.toFixed(2)}%` : '--'}
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -114,7 +202,9 @@ export default function AgentBacktest() {
                 <Target className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground">--</div>
+                <div className="text-2xl font-bold text-muted-foreground">
+                  {result ? result.result.sharpe_ratio.toFixed(2) : '--'}
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -123,7 +213,9 @@ export default function AgentBacktest() {
                 <TrendingDown className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground">--</div>
+                <div className={`text-2xl font-bold ${result ? 'text-red-500' : 'text-muted-foreground'}`}>
+                  {result ? `-${result.result.max_drawdown_pct.toFixed(2)}%` : '--'}
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -132,7 +224,9 @@ export default function AgentBacktest() {
                 <Percent className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground">--</div>
+                <div className="text-2xl font-bold text-muted-foreground">
+                  {result ? `${result.result.win_rate.toFixed(1)}%` : '--'}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -146,28 +240,28 @@ export default function AgentBacktest() {
               </div>
             </CardHeader>
             <CardContent>
-              {performanceData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  运行回测后显示 LLM 统计
-                </div>
-              ) : (
+              {result ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">总决策次数</p>
-                    <p className="text-xl font-bold">1,245</p>
-                  </div>
-                  <div>
                     <p className="text-sm text-muted-foreground">总交易次数</p>
-                    <p className="text-xl font-bold">156</p>
+                    <p className="text-xl font-bold">{result.result.total_trades}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">总 Token 消耗</p>
-                    <p className="text-xl font-bold">2.5M</p>
+                    <p className="text-sm text-muted-foreground">盈利次数</p>
+                    <p className="text-xl font-bold text-green-500">{result.result.winning_trades}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">LLM 成本</p>
-                    <p className="text-xl font-bold">$12.50</p>
+                    <p className="text-sm text-muted-foreground">亏损次数</p>
+                    <p className="text-xl font-bold text-red-500">{result.result.losing_trades}</p>
                   </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">盈利因子</p>
+                    <p className="text-xl font-bold">{result.result.profit_factor.toFixed(2)}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  运行回测后显示 LLM 统计
                 </div>
               )}
             </CardContent>
@@ -179,13 +273,13 @@ export default function AgentBacktest() {
               <CardTitle>收益曲线</CardTitle>
             </CardHeader>
             <CardContent>
-              {performanceData.length === 0 ? (
+              {chartData.length === 0 ? (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                   运行回测后显示收益曲线
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={performanceData}>
+                  <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
@@ -193,21 +287,40 @@ export default function AgentBacktest() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" tickLine={false} axisLine={false} />
-                    <YAxis className="text-xs" tickLine={false} axisLine={false} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                    <XAxis
+                      dataKey="time"
+                      className="text-xs"
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => value.split(' ')[1] || value}
+                    />
+                    <YAxis
+                      className="text-xs"
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `$${Number(value).toFixed(0)}`}
+                    />
                     <Tooltip
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const value = Number(payload[0].value) || 0;
                           return (
                             <div className="rounded-lg border bg-background p-2 shadow-sm">
-                              <p className="font-bold">${payload[0].value?.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">{payload[0].payload.time}</p>
+                              <p className="font-bold">${value.toFixed(2)}</p>
                             </div>
                           );
                         }
                         return null;
                       }}
                     />
-                    <Area type="monotone" dataKey="value" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorValue)" />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#8b5cf6"
+                      fillOpacity={1}
+                      fill="url(#colorValue)"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -223,28 +336,33 @@ export default function AgentBacktest() {
               </div>
             </CardHeader>
             <CardContent>
-              {decisions.length === 0 ? (
+              {!result || result.trades.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   运行回测后显示决策记录
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {decisions.map((decision, i) => (
-                    <div key={i} className="p-4 rounded-lg border">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={decision.positive ? 'default' : 'destructive'}>
-                            {decision.action}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">{decision.time}</span>
-                        </div>
-                        <span className={`font-medium ${decision.positive ? 'text-green-500' : 'text-red-500'}`}>
-                          {decision.pnl}
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {result.trades.slice(0, 50).map((trade, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg border text-sm">
+                      <div className="flex items-center gap-3">
+                        <Badge variant={trade.pnl >= 0 ? 'default' : 'destructive'}>
+                          {trade.side}
+                        </Badge>
+                        <span className="text-muted-foreground">{formatLocalTimeShort(trade.time)}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span>${trade.price.toFixed(2)}</span>
+                        <span className={`font-medium ${trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{decision.reason}</p>
                     </div>
                   ))}
+                  {result.trades.length > 50 && (
+                    <p className="text-center text-sm text-muted-foreground py-2">
+                      显示前 50 条，共 {result.trades.length} 条
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
