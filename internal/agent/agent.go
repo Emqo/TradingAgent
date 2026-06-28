@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
+	"github.com/Emqo/TradingAgent/internal/database"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
 	"github.com/Emqo/TradingAgent/internal/logger"
@@ -23,6 +24,7 @@ type Agent struct {
 	session   *llm.Session
 	metrics   *metrics.Metrics
 	logger    *logger.Logger
+	db        *database.DB
 	config    Config
 }
 
@@ -41,6 +43,7 @@ func New(
 	arbitrageManager *arbitrage.Manager,
 	metricsInstance *metrics.Metrics,
 	log *logger.Logger,
+	db *database.DB,
 	cfg Config,
 ) *Agent {
 	// Create session with system prompt
@@ -72,6 +75,7 @@ Be concise and focused on actionable insights.`
 		session:   session,
 		metrics:   metricsInstance,
 		logger:    log,
+		db:        db,
 		config:    cfg,
 	}
 }
@@ -180,6 +184,23 @@ func (a *Agent) decide(ctx context.Context) error {
 		Role:    "assistant",
 		Content: response.Content,
 	})
+
+	// Step 7: Store decision in database
+	if a.db != nil {
+		decision := &database.Decision{
+			Action:     "ANALYZE",
+			Reason:     response.Content,
+			Result:     "Analysis completed",
+			TokensUsed: response.TokenUsage.TotalTokens,
+			LatencyMs:  int(llmLatency * 1000),
+		}
+
+		if err := a.db.InsertDecision(ctx, decision); err != nil {
+			a.logger.Warnf("Failed to store decision in database: %v", err)
+		} else {
+			a.logger.WithField("decision_id", decision.ID).Info("Decision stored in database")
+		}
+	}
 
 	a.logger.Info("Decision logged")
 

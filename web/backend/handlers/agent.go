@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -116,6 +117,9 @@ func (h *AgentHandler) GetDecisions(c *gin.Context) {
 		return
 	}
 
+	// Debug log
+	fmt.Printf("Found %d decisions in database\n", len(dbDecisions))
+
 	// Convert to response format
 	decisions := make([]Decision, len(dbDecisions))
 	for i, d := range dbDecisions {
@@ -137,23 +141,33 @@ func (h *AgentHandler) GetDecisions(c *gin.Context) {
 
 // GetStats returns agent statistics.
 func (h *AgentHandler) GetStats(c *gin.Context) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	ctx := c.Request.Context()
 
-	// Calculate win rate
-	winRate := 0.0
-	if h.stats.TodayTrades > 0 {
-		// TODO: Calculate actual win rate from trade history
-		winRate = 62.0 // Placeholder
+	// Get decisions from database to calculate stats
+	totalDecisions := 0
+	totalTokens := 0
+
+	if h.db != nil {
+		decisions, err := h.db.GetDecisions(ctx, 1000)
+		if err == nil {
+			totalDecisions = len(decisions)
+			for _, d := range decisions {
+				totalTokens += d.TokensUsed
+			}
+		} else {
+			fmt.Printf("Error getting decisions: %v\n", err)
+		}
+	} else {
+		fmt.Println("Database is nil in GetStats")
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"today_decisions": h.stats.TodayDecisions,
-		"today_trades":    h.stats.TodayTrades,
-		"today_pnl":       h.stats.TodayPnL,
-		"win_rate":        winRate,
-		"llm_calls":       h.stats.LLMCalls,
-		"tokens_used":     h.stats.TokensUsed,
+		"today_decisions": totalDecisions,
+		"today_trades":    0, // TODO: Calculate from trades table
+		"today_pnl":       0, // TODO: Calculate from trades table
+		"win_rate":        0, // TODO: Calculate from trades table
+		"llm_calls":       totalDecisions,
+		"tokens_used":     totalTokens,
 	})
 }
 

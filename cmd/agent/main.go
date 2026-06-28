@@ -227,6 +227,7 @@ func main() {
 		arbitrageManager,
 		metricsInstance,
 		log,
+		db,
 		agent.Config{
 			Interval:    interval,
 			MaxTokens:   cfg.Agent.MaxTokens,
@@ -248,7 +249,7 @@ func main() {
 			JWTExpiry: 24 * time.Hour,
 			AllowedOrigins: []string{"http://localhost:3000", "http://localhost:5173"},
 		},
-		nil, // Database pool (TODO: pass db.Pool())
+		db,
 		exchangeProvider,
 		riskManager,
 		arbitrageManager,
