@@ -11,6 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatLocalTimeShort } from '@/lib/utils';
 
 interface ArbitrageOpportunity {
   type: string;
@@ -23,10 +24,10 @@ interface ArbitrageOpportunity {
 export default function Arbitrage() {
   const [scanning, setScanning] = useState(true);
   const [opportunities] = useState<ArbitrageOpportunity[]>([
-    { type: '三角套利', path: 'USDT→BTC→ETH→USDT', spread_bps: 18.5, profit_usdt: 12.50, timestamp: '14:30:25' },
-    { type: '三角套利', path: 'USDT→ETH→SOL→USDT', spread_bps: 15.2, profit_usdt: 8.30, timestamp: '14:28:10' },
-    { type: '期现套利', path: 'BTC 永续合约', spread_bps: 0, profit_usdt: 45.00, timestamp: '14:00:00' },
-    { type: '期现套利', path: 'ETH 永续合约', spread_bps: 0, profit_usdt: 32.00, timestamp: '14:00:00' },
+    { type: '三角套利', path: 'USDT→BTC→ETH→USDT', spread_bps: 18.5, profit_usdt: 12.50, timestamp: '2026-06-28T14:30:25+08:00' },
+    { type: '三角套利', path: 'USDT→ETH→SOL→USDT', spread_bps: 15.2, profit_usdt: 8.30, timestamp: '2026-06-28T14:28:10+08:00' },
+    { type: '期现套利', path: 'BTC 永续合约', spread_bps: 0, profit_usdt: 45.00, timestamp: '2026-06-28T14:00:00+08:00' },
+    { type: '期现套利', path: 'ETH 永续合约', spread_bps: 0, profit_usdt: 32.00, timestamp: '2026-06-28T14:00:00+08:00' },
   ]);
 
   const [stats] = useState({
@@ -138,7 +139,7 @@ export default function Arbitrage() {
                   <div key={i} className="p-4 rounded-lg border bg-muted/50">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium">{opp.path}</span>
-                      <span className="text-sm text-muted-foreground">{opp.timestamp}</span>
+                      <span className="text-sm text-muted-foreground">{formatLocalTimeShort(opp.timestamp)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -182,7 +183,7 @@ export default function Arbitrage() {
                   <div key={i} className="p-4 rounded-lg border bg-muted/50">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium">{opp.path}</span>
-                      <span className="text-sm text-muted-foreground">{opp.timestamp}</span>
+                      <span className="text-sm text-muted-foreground">{formatLocalTimeShort(opp.timestamp)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">

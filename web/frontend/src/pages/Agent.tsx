@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { formatLocalTimeShort } from '@/lib/utils';
 
 interface Decision {
   time: string;
@@ -28,21 +29,21 @@ export default function Agent() {
   const [running, setRunning] = useState(true);
   const [decisions] = useState<Decision[]>([
     {
-      time: '14:30:25',
+      time: '2026-06-28T14:30:25+08:00',
       action: '买入 BTCUSDT',
       reason: 'BTC 在 $60,500 形成支撑，RSI 超卖，预计反弹',
       result: '成功买入 0.1 BTC @ $60,500',
       pnl: 0,
     },
     {
-      time: '14:25:10',
+      time: '2026-06-28T14:25:10+08:00',
       action: '卖出 ETHUSDT',
       reason: 'ETH 触及阻力位 $1,600，获利了结',
       result: '成功卖出 1.5 ETH @ $1,595',
       pnl: 85,
     },
     {
-      time: '14:20:05',
+      time: '2026-06-28T14:20:05+08:00',
       action: '持有',
       reason: '市场震荡，等待明确信号',
       result: '无操作',
@@ -202,7 +203,7 @@ export default function Agent() {
                       <Badge variant={decision.pnl > 0 ? 'default' : decision.pnl < 0 ? 'destructive' : 'secondary'}>
                         {decision.action}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">{decision.time}</span>
+                      <span className="text-sm text-muted-foreground">{formatLocalTimeShort(decision.time)}</span>
                     </div>
                     {decision.pnl !== 0 && (
                       <span className={`font-medium ${decision.pnl > 0 ? 'text-green-500' : 'text-red-500'}`}>

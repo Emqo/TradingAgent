@@ -37,11 +37,11 @@ const performanceData = [
 ];
 
 const trades = [
-  { time: '2024-01-15 14:30', type: '三角套利', path: 'USDT→BTC→ETH→USDT', spread: '18.5 bps', pnl: '+$12.50', positive: true },
-  { time: '2024-01-15 15:00', type: '三角套利', path: 'USDT→ETH→SOL→USDT', spread: '15.2 bps', pnl: '+$8.30', positive: true },
-  { time: '2024-01-16 09:00', type: '期现套利', path: 'BTC 永续合约', spread: '0.01%', pnl: '+$45.00', positive: true },
-  { time: '2024-01-16 10:30', type: '三角套利', path: 'USDT→BTC→BNB→USDT', spread: '12.8 bps', pnl: '-$3.20', positive: false },
-  { time: '2024-01-16 14:00', type: '期现套利', path: 'ETH 永续合约', spread: '0.01%', pnl: '+$32.00', positive: true },
+  { time: '2024-01-15T14:30:00+08:00', type: '三角套利', path: 'USDT→BTC→ETH→USDT', spread: '18.5 bps', pnl: '+$12.50', positive: true },
+  { time: '2024-01-15T15:00:00+08:00', type: '三角套利', path: 'USDT→ETH→SOL→USDT', spread: '15.2 bps', pnl: '+$8.30', positive: true },
+  { time: '2024-01-16T09:00:00+08:00', type: '期现套利', path: 'BTC 永续合约', spread: '0.01%', pnl: '+$45.00', positive: true },
+  { time: '2024-01-16T10:30:00+08:00', type: '三角套利', path: 'USDT→BTC→BNB→USDT', spread: '12.8 bps', pnl: '-$3.20', positive: false },
+  { time: '2024-01-16T14:00:00+08:00', type: '期现套利', path: 'ETH 永续合约', spread: '0.01%', pnl: '+$32.00', positive: true },
 ];
 
 export default function ArbitrageBacktest() {

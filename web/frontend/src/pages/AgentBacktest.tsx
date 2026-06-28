@@ -39,11 +39,11 @@ const performanceData = [
 ];
 
 const decisions = [
-  { time: '2024-01-15 14:30', action: '买入 BTCUSDT', reason: 'RSI 超卖，支撑位反弹', pnl: '+$250', positive: true },
-  { time: '2024-01-16 10:00', action: '卖出 ETHUSDT', reason: '触及阻力位，获利了结', pnl: '+$180', positive: true },
-  { time: '2024-01-17 09:30', action: '买入 SOLUSDT', reason: '突破下降趋势线', pnl: '+$120', positive: true },
-  { time: '2024-01-18 14:00', action: '卖出 BTCUSDT', reason: '市场转弱，止损出场', pnl: '-$80', positive: false },
-  { time: '2024-01-19 11:00', action: '买入 ETHUSDT', reason: '资金费率转正，做多', pnl: '+$150', positive: true },
+  { time: '2024-01-15T14:30:00+08:00', action: '买入 BTCUSDT', reason: 'RSI 超卖，支撑位反弹', pnl: '+$250', positive: true },
+  { time: '2024-01-16T10:00:00+08:00', action: '卖出 ETHUSDT', reason: '触及阻力位，获利了结', pnl: '+$180', positive: true },
+  { time: '2024-01-17T09:30:00+08:00', action: '买入 SOLUSDT', reason: '突破下降趋势线', pnl: '+$120', positive: true },
+  { time: '2024-01-18T14:00:00+08:00', action: '卖出 BTCUSDT', reason: '市场转弱，止损出场', pnl: '-$80', positive: false },
+  { time: '2024-01-19T11:00:00+08:00', action: '买入 ETHUSDT', reason: '资金费率转正，做多', pnl: '+$150', positive: true },
 ];
 
 export default function AgentBacktest() {
