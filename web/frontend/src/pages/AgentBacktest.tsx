@@ -102,10 +102,10 @@ export default function AgentBacktest() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">总收益</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-500" />
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-500">+34.5%</div>
+                <div className="text-2xl font-bold text-muted-foreground">--</div>
               </CardContent>
             </Card>
             <Card>
@@ -114,16 +114,16 @@ export default function AgentBacktest() {
                 <Target className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">1.92</div>
+                <div className="text-2xl font-bold text-muted-foreground">--</div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">最大回撤</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-500" />
+                <TrendingDown className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-500">-8.5%</div>
+                <div className="text-2xl font-bold text-muted-foreground">--</div>
               </CardContent>
             </Card>
             <Card>
@@ -132,7 +132,7 @@ export default function AgentBacktest() {
                 <Percent className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">62%</div>
+                <div className="text-2xl font-bold text-muted-foreground">--</div>
               </CardContent>
             </Card>
           </div>
