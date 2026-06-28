@@ -20,6 +20,7 @@ import (
 	"github.com/Emqo/TradingAgent/internal/risk"
 	"github.com/Emqo/TradingAgent/internal/strategy"
 	"github.com/Emqo/TradingAgent/internal/tools"
+	"github.com/Emqo/TradingAgent/web/backend"
 )
 
 func main() {
@@ -157,10 +158,16 @@ func main() {
 		}
 	}()
 
+	// Start web server (optional - requires database)
+	webServerPort := 8080
+	if port := os.Getenv("WEB_PORT"); port != "" {
+		fmt.Sscanf(port, "%d", &webServerPort)
+	}
+
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
-	fmt.Println("║         TradingAgent v0.7.0              ║")
-	fmt.Println("║     Structured Logging                   ║")
+	fmt.Println("║         TradingAgent v1.0.0              ║")
+	fmt.Println("║     Web Dashboard                        ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
@@ -169,6 +176,7 @@ func main() {
 	fmt.Printf("  Tools:    %d registered\n", len(registry.List()))
 	fmt.Printf("  Memory:   Short-term: 100, Long-term: 1000\n")
 	fmt.Printf("  Logging:  JSON structured\n")
+	fmt.Printf("  Web UI:   http://localhost:%d\n", webServerPort)
 	fmt.Println()
 
 	// Create agent
@@ -185,6 +193,37 @@ func main() {
 			Temperature: cfg.Agent.Temperature,
 		},
 	)
+
+	// Start web server (optional - only if database is configured)
+	// For now, we'll start a simple web server without database
+	// In production, this would connect to PostgreSQL
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "trading-agent-secret-key-change-in-production"
+	}
+
+	webServer, err := backend.NewServer(
+		backend.Config{
+			Port:      webServerPort,
+			JWTSecret: jwtSecret,
+			JWTExpiry: 24 * time.Hour,
+			AllowedOrigins: []string{"http://localhost:3000", "http://localhost:5173"},
+		},
+		nil, // No database for now
+		exchangeProvider,
+		riskManager,
+		arbitrageManager,
+		tradingAgent,
+	)
+	if err != nil {
+		log.Warnf("Failed to create web server: %v", err)
+	} else {
+		go func() {
+			if err := webServer.Start(fmt.Sprintf(":%d", webServerPort)); err != nil {
+				log.Errorf("Web server error: %v", err)
+			}
+		}()
+	}
 
 	// Handle graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
