@@ -1,237 +1,183 @@
-import { useState } from 'react';
 import { Save } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState('risk');
-
-  const tabs = [
-    { id: 'risk', name: '风险管理' },
-    { id: 'arbitrage', name: '套利设置' },
-    { id: 'llm', name: 'LLM 配置' },
-    { id: 'exchange', name: '交易所' },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">设置</h1>
-        <p className="text-gray-400">配置您的交易代理</p>
+        <h1 className="text-3xl font-bold tracking-tight">设置</h1>
+        <p className="text-muted-foreground">
+          配置您的交易代理参数
+        </p>
       </div>
 
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
-        {/* 选项卡 */}
-        <div className="border-b border-gray-700">
-          <nav className="flex space-x-8 px-6">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-500'
-                    : 'border-transparent text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </nav>
-        </div>
+      <Tabs defaultValue="risk" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="risk">风险管理</TabsTrigger>
+          <TabsTrigger value="arbitrage">套利设置</TabsTrigger>
+          <TabsTrigger value="llm">LLM 配置</TabsTrigger>
+          <TabsTrigger value="exchange">交易所</TabsTrigger>
+        </TabsList>
 
-        {/* 内容 */}
-        <div className="p-6">
-          {activeTab === 'risk' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">风险管理设置</h3>
+        <TabsContent value="risk" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>风险管理</CardTitle>
+              <CardDescription>
+                配置风险控制参数，保护您的资金安全
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400">最大仓位 (USDT)</label>
-                  <input
-                    type="number"
-                    defaultValue={1000}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="max-position">最大仓位 (USDT)</Label>
+                  <Input id="max-position" type="number" defaultValue={1000} />
+                  <p className="text-xs text-muted-foreground">
+                    单笔交易的最大仓位
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">最大日亏损 (USDT)</label>
-                  <input
-                    type="number"
-                    defaultValue={500}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="max-daily-loss">最大日亏损 (USDT)</Label>
+                  <Input id="max-daily-loss" type="number" defaultValue={500} />
+                  <p className="text-xs text-muted-foreground">
+                    单日最大允许亏损金额
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">最大回撤 (%)</label>
-                  <input
-                    type="number"
-                    defaultValue={10}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="max-drawdown">最大回撤 (%)</Label>
+                  <Input id="max-drawdown" type="number" defaultValue={10} />
+                  <p className="text-xs text-muted-foreground">
+                    从最高点到最低点的最大跌幅
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">最大杠杆</label>
-                  <input
-                    type="number"
-                    defaultValue={3}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="max-leverage">最大杠杆</Label>
+                  <Input id="max-leverage" type="number" defaultValue={3} />
+                  <p className="text-xs text-muted-foreground">
+                    允许的最大杠杆倍数
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">亏损后冷却时间（分钟）</label>
-                  <input
-                    type="number"
-                    defaultValue={5}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="cooldown">亏损后冷却时间（分钟）</Label>
+                  <Input id="cooldown" type="number" defaultValue={5} />
+                  <p className="text-xs text-muted-foreground">
+                    亏损后暂停交易的时间
+                  </p>
                 </div>
               </div>
-            </div>
-          )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {activeTab === 'arbitrage' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">套利设置</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white">三角套利</p>
-                    <p className="text-sm text-gray-400">启用三角套利检测</p>
-                  </div>
-                  <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600">
-                    <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white">期现套利</p>
-                    <p className="text-sm text-gray-400">启用期现套利（资金费率套利）</p>
-                  </div>
-                  <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600">
-                    <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                  </button>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400">最小价差 (bps)</label>
-                  <input
-                    type="number"
-                    defaultValue={15}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400">最大仓位 (USDT)</label>
-                  <input
-                    type="number"
-                    defaultValue={1000}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'llm' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">LLM 配置</h3>
+        <TabsContent value="arbitrage" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>套利设置</CardTitle>
+              <CardDescription>
+                配置三角套利和期现套利参数
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400">提供商</label>
-                  <select className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white">
-                    <option value="claude">Claude</option>
-                    <option value="openai">OpenAI</option>
-                  </select>
+                <div className="space-y-2">
+                  <Label htmlFor="min-spread">最小价差 (bps)</Label>
+                  <Input id="min-spread" type="number" defaultValue={15} />
+                  <p className="text-xs text-muted-foreground">
+                    触发套利的最小价差（基点）
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">模型</label>
-                  <input
-                    type="text"
-                    defaultValue="mimo-v2.5-pro"
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm text-gray-400">Base URL</label>
-                  <input
-                    type="text"
-                    defaultValue="https://token-plan-cn.xiaomimimo.com/anthropic"
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm text-gray-400">API Key</label>
-                  <input
-                    type="password"
-                    placeholder="请输入 API Key"
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400">最大 Token 数</label>
-                  <input
-                    type="number"
-                    defaultValue={4096}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400">温度</label>
-                  <input
-                    type="number"
-                    defaultValue={0.7}
-                    step={0.1}
-                    min={0}
-                    max={2}
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="arb-position">最大仓位 (USDT)</Label>
+                  <Input id="arb-position" type="number" defaultValue={1000} />
+                  <p className="text-xs text-muted-foreground">
+                    套利交易的最大仓位
+                  </p>
                 </div>
               </div>
-            </div>
-          )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {activeTab === 'exchange' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">交易所设置</h3>
+        <TabsContent value="llm" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>LLM 配置</CardTitle>
+              <CardDescription>
+                配置大语言模型参数
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400">交易所</label>
-                  <select className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white">
-                    <option>Binance</option>
-                  </select>
+                <div className="space-y-2">
+                  <Label htmlFor="provider">提供商</Label>
+                  <Input id="provider" type="text" defaultValue="Claude" disabled />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">模式</label>
-                  <select className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white">
-                    <option>测试网</option>
-                    <option>主网</option>
-                  </select>
+                <div className="space-y-2">
+                  <Label htmlFor="model">模型</Label>
+                  <Input id="model" type="text" defaultValue="mimo-v2.5-pro" />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">API Key</label>
-                  <input
-                    type="password"
-                    placeholder="请输入 API Key"
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="base-url">Base URL</Label>
+                  <Input id="base-url" type="text" defaultValue="https://token-plan-cn.xiaomimimo.com/anthropic" />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400">API Secret</label>
-                  <input
-                    type="password"
-                    placeholder="请输入 API Secret"
-                    className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="api-key">API Key</Label>
+                  <Input id="api-key" type="password" placeholder="请输入 API Key" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="max-tokens">最大 Token 数</Label>
+                  <Input id="max-tokens" type="number" defaultValue={4096} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="temperature">温度</Label>
+                  <Input id="temperature" type="number" defaultValue={0.7} step={0.1} />
                 </div>
               </div>
-            </div>
-          )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <div className="mt-6 pt-6 border-t border-gray-700">
-            <button className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
-              <Save className="h-5 w-5 mr-2" />
-              保存设置
-            </button>
-          </div>
-        </div>
+        <TabsContent value="exchange" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>交易所设置</CardTitle>
+              <CardDescription>
+                配置交易所连接参数
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="exchange">交易所</Label>
+                  <Input id="exchange" type="text" defaultValue="Binance" disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mode">模式</Label>
+                  <Input id="mode" type="text" defaultValue="测试网" disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="exchange-api-key">API Key</Label>
+                  <Input id="exchange-api-key" type="password" placeholder="请输入 API Key" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="exchange-api-secret">API Secret</Label>
+                  <Input id="exchange-api-secret" type="password" placeholder="请输入 API Secret" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex justify-end">
+        <Button size="lg">
+          <Save className="mr-2 h-4 w-4" />
+          保存设置
+        </Button>
       </div>
     </div>
   );

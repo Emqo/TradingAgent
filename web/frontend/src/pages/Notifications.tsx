@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import { Save, MessageSquare, Mail } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 
 export default function Notifications() {
   const [telegramEnabled, setTelegramEnabled] = useState(false);
@@ -8,189 +14,147 @@ export default function Notifications() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">通知设置</h1>
-        <p className="text-gray-400">配置通知渠道</p>
+        <h1 className="text-3xl font-bold tracking-tight">通知设置</h1>
+        <p className="text-muted-foreground">
+          配置通知渠道，及时获取交易和风险信息
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Telegram */}
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <MessageSquare className="h-6 w-6 text-blue-500 mr-3" />
-              <div>
-                <h3 className="text-lg font-semibold text-white">Telegram</h3>
-                <p className="text-sm text-gray-400">通过 Telegram 机器人接收通知</p>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-blue-500" />
+                <CardTitle>Telegram</CardTitle>
               </div>
-            </div>
-            <button
-              onClick={() => setTelegramEnabled(!telegramEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full ${
-                telegramEnabled ? 'bg-blue-600' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                  telegramEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
+              <Switch
+                checked={telegramEnabled}
+                onCheckedChange={setTelegramEnabled}
               />
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-400">机器人 Token</label>
-              <input
+            </div>
+            <CardDescription>
+              通过 Telegram 机器人接收实时通知
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="telegram-token">机器人 Token</Label>
+              <Input
+                id="telegram-token"
                 type="password"
                 placeholder="请输入 Telegram 机器人 Token"
                 disabled={!telegramEnabled}
-                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white disabled:opacity-50"
               />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400">聊天 ID</label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="telegram-chat-id">聊天 ID</Label>
+              <Input
+                id="telegram-chat-id"
                 type="text"
                 placeholder="请输入聊天 ID"
                 disabled={!telegramEnabled}
-                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white disabled:opacity-50"
               />
             </div>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-400">通知类型：</p>
+            <Separator />
+            <div className="space-y-3">
+              <p className="text-sm font-medium">通知类型</p>
               <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    disabled={!telegramEnabled}
-                    className="mr-2 rounded"
-                  />
-                  <span className="text-white text-sm">交易执行</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    disabled={!telegramEnabled}
-                    className="mr-2 rounded"
-                  />
-                  <span className="text-white text-sm">风险告警</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    disabled={!telegramEnabled}
-                    className="mr-2 rounded"
-                  />
-                  <span className="text-white text-sm">套利机会</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    disabled={!telegramEnabled}
-                    className="mr-2 rounded"
-                  />
-                  <span className="text-white text-sm">每日汇总</span>
-                </label>
+                {[
+                  { label: '交易执行', description: '当交易被执行时通知' },
+                  { label: '风险告警', description: '当触发风控规则时通知' },
+                  { label: '套利机会', description: '当发现套利机会时通知' },
+                  { label: '每日汇总', description: '每日交易和收益汇总' },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.description}</p>
+                    </div>
+                    <Switch disabled={!telegramEnabled} defaultChecked={item.label !== '每日汇总'} />
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* 邮件 */}
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <Mail className="h-6 w-6 text-blue-500 mr-3" />
-              <div>
-                <h3 className="text-lg font-semibold text-white">邮件</h3>
-                <p className="text-sm text-gray-400">通过邮件接收通知</p>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-green-500" />
+                <CardTitle>邮件</CardTitle>
               </div>
-            </div>
-            <button
-              onClick={() => setEmailEnabled(!emailEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full ${
-                emailEnabled ? 'bg-blue-600' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                  emailEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
+              <Switch
+                checked={emailEnabled}
+                onCheckedChange={setEmailEnabled}
               />
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-400">SMTP 服务器</label>
-              <input
+            </div>
+            <CardDescription>
+              通过邮件接收通知和报告
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="smtp-server">SMTP 服务器</Label>
+              <Input
+                id="smtp-server"
                 type="text"
                 placeholder="smtp.gmail.com"
                 disabled={!emailEnabled}
-                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white disabled:opacity-50"
               />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400">发件人邮箱</label>
-              <input
-                type="email"
-                placeholder="your@email.com"
-                disabled={!emailEnabled}
-                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400">收件人邮箱</label>
-              <input
-                type="email"
-                placeholder="recipient@email.com"
-                disabled={!emailEnabled}
-                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white disabled:opacity-50"
-              />
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-400">通知类型：</p>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    disabled={!emailEnabled}
-                    className="mr-2 rounded"
-                  />
-                  <span className="text-white text-sm">交易执行</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    disabled={!emailEnabled}
-                    className="mr-2 rounded"
-                  />
-                  <span className="text-white text-sm">风险告警</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    disabled={!emailEnabled}
-                    className="mr-2 rounded"
-                  />
-                  <span className="text-white text-sm">每日汇总</span>
-                </label>
+                <Label htmlFor="from-email">发件人邮箱</Label>
+                <Input
+                  id="from-email"
+                  type="email"
+                  placeholder="your@email.com"
+                  disabled={!emailEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="to-email">收件人邮箱</Label>
+                <Input
+                  id="to-email"
+                  type="email"
+                  placeholder="recipient@email.com"
+                  disabled={!emailEnabled}
+                />
               </div>
             </div>
-          </div>
-        </div>
+            <Separator />
+            <div className="space-y-3">
+              <p className="text-sm font-medium">通知类型</p>
+              <div className="space-y-2">
+                {[
+                  { label: '交易执行', description: '当交易被执行时通知' },
+                  { label: '风险告警', description: '当触发风控规则时通知' },
+                  { label: '每日汇总', description: '每日交易和收益汇总' },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.description}</p>
+                    </div>
+                    <Switch disabled={!emailEnabled} defaultChecked={item.label !== '每日汇总'} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex justify-end">
-        <button className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
-          <Save className="h-5 w-5 mr-2" />
+        <Button size="lg">
+          <Save className="mr-2 h-4 w-4" />
           保存通知设置
-        </button>
+        </Button>
       </div>
     </div>
   );
