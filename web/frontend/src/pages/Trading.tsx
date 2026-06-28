@@ -60,12 +60,17 @@ export default function Trading() {
     try {
       // 获取决策日志
       const decisionsRes = await axios.get(`${API_URL}/agent/decisions`);
-      setDecisions(decisionsRes.data.decisions || []);
+      const allDecisions = decisionsRes.data.decisions || [];
+      // 过滤：只显示交易决策（非套利）
+      const tradingDecisions = allDecisions.filter((d: Decision) =>
+        d.action !== '分析套利' && d.action !== '执行套利'
+      );
+      setDecisions(tradingDecisions);
 
       // 获取 Agent 统计
       const statsRes = await axios.get(`${API_URL}/agent/stats`);
       setStats({
-        today_decisions: statsRes.data.today_decisions || 0,
+        today_decisions: tradingDecisions.length,
         today_trades: statsRes.data.today_trades || 0,
         today_pnl: statsRes.data.today_pnl || 0,
         win_rate: statsRes.data.win_rate || 0,
