@@ -122,20 +122,18 @@ export default function Layout() {
         {/* 用户信息 */}
         <div className="border-t p-4">
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="ghost" className="w-full justify-start gap-3 h-auto p-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {user?.username?.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {!collapsed && (
-                  <div className="flex flex-col items-start">
-                    <span className="text-sm font-medium">{user?.username}</span>
-                    <span className="text-xs text-muted-foreground">{user?.email}</span>
-                  </div>
-                )}
-              </Button>
+            <DropdownMenuTrigger className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  {user?.username?.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              {!collapsed && (
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium">{user?.username}</span>
+                  <span className="text-xs text-muted-foreground">{user?.email}</span>
+                </div>
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>我的账户</DropdownMenuLabel>

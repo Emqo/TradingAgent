@@ -21,28 +21,9 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const performanceData = [
-  { date: '2024-01', value: 10000 },
-  { date: '2024-02', value: 10150 },
-  { date: '2024-03', value: 10280 },
-  { date: '2024-04', value: 10420 },
-  { date: '2024-05', value: 10550 },
-  { date: '2024-06', value: 10680 },
-  { date: '2024-07', value: 10820 },
-  { date: '2024-08', value: 10950 },
-  { date: '2024-09', value: 11080 },
-  { date: '2024-10', value: 11220 },
-  { date: '2024-11', value: 11350 },
-  { date: '2024-12', value: 11485 },
-];
+const performanceData: { date: string; value: number }[] = [];
 
-const trades = [
-  { time: '2024-01-15T14:30:00+08:00', type: '三角套利', path: 'USDT→BTC→ETH→USDT', spread: '18.5 bps', pnl: '+$12.50', positive: true },
-  { time: '2024-01-15T15:00:00+08:00', type: '三角套利', path: 'USDT→ETH→SOL→USDT', spread: '15.2 bps', pnl: '+$8.30', positive: true },
-  { time: '2024-01-16T09:00:00+08:00', type: '期现套利', path: 'BTC 永续合约', spread: '0.01%', pnl: '+$45.00', positive: true },
-  { time: '2024-01-16T10:30:00+08:00', type: '三角套利', path: 'USDT→BTC→BNB→USDT', spread: '12.8 bps', pnl: '-$3.20', positive: false },
-  { time: '2024-01-16T14:00:00+08:00', type: '期现套利', path: 'ETH 永续合约', spread: '0.01%', pnl: '+$32.00', positive: true },
-];
+const trades: { time: string; type: string; path: string; spread: string; pnl: string; positive: boolean }[] = [];
 
 export default function ArbitrageBacktest() {
   const [running, setRunning] = useState(false);
@@ -156,32 +137,38 @@ export default function ArbitrageBacktest() {
               <CardTitle>收益曲线</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={performanceData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" className="text-xs" tickLine={false} axisLine={false} />
-                  <YAxis className="text-xs" tickLine={false} axisLine={false} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="rounded-lg border bg-background p-2 shadow-sm">
-                            <p className="font-bold">${payload[0].value?.toLocaleString()}</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="#22c55e" fillOpacity={1} fill="url(#colorValue)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {performanceData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  运行回测后显示收益曲线
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={performanceData}>
+                    <defs>
+                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" className="text-xs" tickLine={false} axisLine={false} />
+                    <YAxis className="text-xs" tickLine={false} axisLine={false} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                              <p className="font-bold">${payload[0].value?.toLocaleString()}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="#22c55e" fillOpacity={1} fill="url(#colorValue)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -191,27 +178,33 @@ export default function ArbitrageBacktest() {
               <CardTitle>套利记录</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {trades.map((trade, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-lg border">
-                    <div className="flex items-center gap-4">
-                      <Badge variant={trade.type === '三角套利' ? 'default' : 'secondary'}>
-                        {trade.type}
-                      </Badge>
-                      <div>
-                        <p className="font-medium">{trade.path}</p>
-                        <p className="text-sm text-muted-foreground">{trade.time}</p>
+              {trades.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  运行回测后显示套利记录
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {trades.map((trade, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 rounded-lg border">
+                      <div className="flex items-center gap-4">
+                        <Badge variant={trade.type === '三角套利' ? 'default' : 'secondary'}>
+                          {trade.type}
+                        </Badge>
+                        <div>
+                          <p className="font-medium">{trade.path}</p>
+                          <p className="text-sm text-muted-foreground">{trade.time}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">价差: {trade.spread}</p>
+                        <p className={`font-medium ${trade.positive ? 'text-green-500' : 'text-red-500'}`}>
+                          {trade.pnl}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">价差: {trade.spread}</p>
-                      <p className={`font-medium ${trade.positive ? 'text-green-500' : 'text-red-500'}`}>
-                        {trade.pnl}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
