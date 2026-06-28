@@ -1,14 +1,13 @@
 package backend
 
 import (
-	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/Emqo/TradingAgent/internal/agent"
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
+	"github.com/Emqo/TradingAgent/internal/database"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/risk"
 	"github.com/Emqo/TradingAgent/web/backend/handlers"
@@ -21,7 +20,7 @@ import (
 // Server represents the web server.
 type Server struct {
 	router     *gin.Engine
-	db         *sql.DB
+	db         *database.DB
 	jwtAuth    *middleware.JWTAuth
 	userStore  store.UserStoreInterface
 	authHandler *handlers.AuthHandler
@@ -41,7 +40,7 @@ type Config struct {
 // NewServer creates a new web server.
 func NewServer(
 	cfg Config,
-	db *sql.DB,
+	db *database.DB,
 	exchange exchange.Exchange,
 	riskMgr *risk.Manager,
 	arbMgr *arbitrage.Manager,
@@ -52,8 +51,8 @@ func NewServer(
 
 	// Create handlers
 	dashboardHandler := handlers.NewDashboardHandler(exchange, riskMgr, arbMgr, agent)
-	arbitrageHandler := handlers.NewArbitrageHandler(exchange, arbMgr)
-	agentHandler := handlers.NewAgentHandler()
+	arbitrageHandler := handlers.NewArbitrageHandler(exchange, arbMgr, db)
+	agentHandler := handlers.NewAgentHandler(db)
 
 	// Create router
 	router := gin.Default()
@@ -80,11 +79,9 @@ func NewServer(
 	// Initialize user store
 	var userStore store.UserStoreInterface
 	if db != nil {
-		pgStore := store.NewUserStore(db)
-		if err := pgStore.Init(); err != nil {
-			return nil, fmt.Errorf("init user store: %w", err)
-		}
-		userStore = pgStore
+		// TODO: Implement PostgreSQL-backed user store
+		// For now, use in-memory store
+		userStore = store.NewMemoryUserStore()
 	} else {
 		// Use in-memory store for development
 		userStore = store.NewMemoryUserStore()

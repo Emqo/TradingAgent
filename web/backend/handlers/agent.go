@@ -1,10 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"sync"
-	"time"
 
+	"github.com/Emqo/TradingAgent/internal/database"
 	"github.com/Emqo/TradingAgent/internal/llm"
 	"github.com/gin-gonic/gin"
 )
@@ -12,17 +13,21 @@ import (
 // AgentHandler handles agent-related requests.
 type AgentHandler struct {
 	mu        sync.RWMutex
-	decisions []Decision
+	db        *database.DB
 	stats     AgentStats
 }
 
 // Decision represents an agent decision.
 type Decision struct {
-	Time    string  `json:"time"`
-	Action  string  `json:"action"`
-	Reason  string  `json:"reason"`
-	Result  string  `json:"result"`
-	PnL     float64 `json:"pnl"`
+	ID          int64     `json:"id"`
+	Time        string    `json:"time"`
+	Action      string    `json:"action"`
+	Symbol      string    `json:"symbol"`
+	Reason      string    `json:"reason"`
+	Result      string    `json:"result"`
+	PnL         float64   `json:"pnl"`
+	TokensUsed  int       `json:"tokens_used"`
+	LatencyMs   int       `json:"latency_ms"`
 }
 
 // AgentStats represents agent statistics.
@@ -36,9 +41,9 @@ type AgentStats struct {
 }
 
 // NewAgentHandler creates a new agent handler.
-func NewAgentHandler() *AgentHandler {
+func NewAgentHandler(db *database.DB) *AgentHandler {
 	return &AgentHandler{
-		decisions: make([]Decision, 0),
+		db: db,
 		stats: AgentStats{
 			TodayDecisions: 0,
 			TodayTrades:    0,
@@ -50,25 +55,40 @@ func NewAgentHandler() *AgentHandler {
 	}
 }
 
-// AddDecision adds a new decision to the history.
-func (h *AgentHandler) AddDecision(decision Decision) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	decision.Time = time.Now().Format("2006-01-02T15:04:05-07:00")
-	h.decisions = append(h.decisions, decision)
-
-	// Keep only last 100 decisions
-	if len(h.decisions) > 100 {
-		h.decisions = h.decisions[len(h.decisions)-100:]
+// AddDecision adds a new decision to the database.
+func (h *AgentHandler) AddDecision(decision Decision) error {
+	if h.db == nil {
+		return nil
 	}
 
+	ctx := context.Background()
+	dbDecision := &database.Decision{
+		Action:     decision.Action,
+		Symbol:     decision.Symbol,
+		Reason:     decision.Reason,
+		Result:     decision.Result,
+		PnL:        decision.PnL,
+		TokensUsed: decision.TokensUsed,
+		LatencyMs:  decision.LatencyMs,
+	}
+
+	if err := h.db.InsertDecision(ctx, dbDecision); err != nil {
+		return err
+	}
+
+	decision.ID = dbDecision.ID
+	decision.Time = dbDecision.CreatedAt.Format("2006-01-02T15:04:05-07:00")
+
 	// Update stats
+	h.mu.Lock()
 	h.stats.TodayDecisions++
 	if decision.PnL != 0 {
 		h.stats.TodayTrades++
 		h.stats.TodayPnL += decision.PnL
 	}
+	h.mu.Unlock()
+
+	return nil
 }
 
 // UpdateLLMStats updates LLM call statistics.
@@ -80,14 +100,39 @@ func (h *AgentHandler) UpdateLLMStats(calls int, tokens int) {
 	h.stats.TokensUsed += tokens
 }
 
-// GetDecisions returns the decision history.
+// GetDecisions returns the decision history from database.
 func (h *AgentHandler) GetDecisions(c *gin.Context) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	ctx := c.Request.Context()
 
-	c.JSON(http.StatusOK, gin.H{
-		"decisions": h.decisions,
-	})
+	if h.db == nil {
+		c.JSON(http.StatusOK, gin.H{"decisions": []Decision{}})
+		return
+	}
+
+	// Get decisions from database
+	dbDecisions, err := h.db.GetDecisions(ctx, 100)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get decisions"})
+		return
+	}
+
+	// Convert to response format
+	decisions := make([]Decision, len(dbDecisions))
+	for i, d := range dbDecisions {
+		decisions[i] = Decision{
+			ID:         d.ID,
+			Time:       d.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
+			Action:     d.Action,
+			Symbol:     d.Symbol,
+			Reason:     d.Reason,
+			Result:     d.Result,
+			PnL:        d.PnL,
+			TokensUsed: d.TokensUsed,
+			LatencyMs:  d.LatencyMs,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"decisions": decisions})
 }
 
 // GetStats returns agent statistics.
@@ -125,7 +170,6 @@ func (h *AgentHandler) ResetDailyStats() {
 // GetDecisionFromLLMResponse creates a decision from an LLM response.
 func (h *AgentHandler) GetDecisionFromLLMResponse(resp *llm.Response, action string, pnl float64) Decision {
 	return Decision{
-		Time:   time.Now().Format("2006-01-02T15:04:05-07:00"),
 		Action: action,
 		Reason: resp.Content,
 		Result: "已记录",
