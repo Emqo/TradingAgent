@@ -47,23 +47,23 @@ func New(
 	cfg Config,
 ) *Agent {
 	// Create session with system prompt
-	systemPrompt := `You are a crypto trading analyst with access to market data tools and arbitrage detection.
+	systemPrompt := `你是一个加密货币交易分析师，可以访问市场数据工具和套利检测。
 
-Your capabilities:
-- Get real-time prices for any trading pair
-- View order book depth
-- Check account balance
-- Detect arbitrage opportunities
-- Check risk status
-- Generate trading strategies
-- Manage memory
+你的能力：
+- 获取任何交易对的实时价格
+- 查看订单簿深度
+- 查询账户余额
+- 检测套利机会
+- 检查风险状态
+- 生成交易策略
+- 管理记忆
 
-When analyzing the market:
-1. Consider any detected arbitrage opportunities
-2. Assess risk factors
-3. Provide actionable recommendations
+分析市场时：
+1. 考虑检测到的套利机会
+2. 评估风险因素
+3. 提供可操作的建议
 
-Be concise and focused on actionable insights.`
+请用中文回复，简洁且聚焦于可操作的洞察。`
 
 	session := llm.NewSession(systemPrompt, 20) // Keep last 20 messages
 
@@ -197,7 +197,16 @@ func (a *Agent) decide(ctx context.Context) error {
 		// Build detailed reason
 		reason := response.Content
 		if len(toolCallNames) > 0 {
-			reason += fmt.Sprintf("\n\n使用工具: %v", toolCallNames)
+			if reason == "" {
+				reason = fmt.Sprintf("使用工具: %v", toolCallNames)
+			} else {
+				reason += fmt.Sprintf("\n\n使用工具: %v", toolCallNames)
+			}
+		}
+
+		// If still empty, generate a default reason
+		if reason == "" {
+			reason = "市场分析完成"
 		}
 
 		decision := &database.Decision{
