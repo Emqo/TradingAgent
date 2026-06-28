@@ -12,6 +12,7 @@ import (
 	"github.com/Emqo/TradingAgent/config"
 	"github.com/Emqo/TradingAgent/internal/agent"
 	"github.com/Emqo/TradingAgent/internal/arbitrage"
+	"github.com/Emqo/TradingAgent/internal/database"
 	"github.com/Emqo/TradingAgent/internal/exchange"
 	"github.com/Emqo/TradingAgent/internal/llm"
 	"github.com/Emqo/TradingAgent/internal/logger"
@@ -164,10 +165,48 @@ func main() {
 		fmt.Sscanf(port, "%d", &webServerPort)
 	}
 
+	// Connect to PostgreSQL
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+	dbPort := 5432
+	if port := os.Getenv("DB_PORT"); port != "" {
+		fmt.Sscanf(port, "%d", &dbPort)
+	}
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+	dbPassword := os.Getenv("DB_PASSWORD")
+	if dbPassword == "" {
+		dbPassword = "postgres"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "trading_agent"
+	}
+
+	db, err := database.New(database.Config{
+		Host:     dbHost,
+		Port:     dbPort,
+		User:     dbUser,
+		Password: dbPassword,
+		DBName:   dbName,
+	})
+	if err != nil {
+		log.Warnf("Failed to connect to database: %v", err)
+		log.Warnf("Running without database (data will not be persisted)")
+		db = nil
+	} else {
+		log.Info("Connected to PostgreSQL")
+		defer db.Close()
+	}
+
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
 	fmt.Println("║         TradingAgent v1.0.0              ║")
-	fmt.Println("║     Web Dashboard                        ║")
+	fmt.Println("║     Web Dashboard + PostgreSQL           ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
@@ -176,6 +215,7 @@ func main() {
 	fmt.Printf("  Tools:    %d registered\n", len(registry.List()))
 	fmt.Printf("  Memory:   Short-term: 100, Long-term: 1000\n")
 	fmt.Printf("  Logging:  JSON structured\n")
+	fmt.Printf("  Database: %s\n", map[bool]string{true: "Connected", false: "Not connected"}[db != nil])
 	fmt.Printf("  Web UI:   http://localhost:%d\n", webServerPort)
 	fmt.Println()
 
@@ -194,14 +234,13 @@ func main() {
 		},
 	)
 
-	// Start web server (optional - only if database is configured)
-	// For now, we'll start a simple web server without database
-	// In production, this would connect to PostgreSQL
+	// Start web server
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "trading-agent-secret-key-change-in-production"
 	}
 
+	// Start web server
 	webServer, err := backend.NewServer(
 		backend.Config{
 			Port:      webServerPort,
@@ -209,7 +248,7 @@ func main() {
 			JWTExpiry: 24 * time.Hour,
 			AllowedOrigins: []string{"http://localhost:3000", "http://localhost:5173"},
 		},
-		nil, // No database for now
+		nil, // Database pool (TODO: pass db.Pool())
 		exchangeProvider,
 		riskManager,
 		arbitrageManager,
