@@ -46,7 +46,7 @@ func NewServer(
 	exchange exchange.Exchange,
 	riskMgr *risk.Manager,
 	arbMgr *arbitrage.Manager,
-	agent *agent.Agent,
+	agent *agent.TradingAgent,
 ) (*Server, error) {
 	// Create JWT auth
 	jwtAuth := middleware.NewJWTAuth(cfg.JWTSecret, cfg.JWTExpiry)

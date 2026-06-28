@@ -224,7 +224,7 @@ func main() {
 	// Print startup info
 	fmt.Println("╔══════════════════════════════════════════╗")
 	fmt.Println("║         TradingAgent v1.0.0              ║")
-	fmt.Println("║     Web Dashboard + PostgreSQL           ║")
+	fmt.Println("║     Dual Agent Architecture              ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 	fmt.Printf("  LLM:      %s (%s)\n", llmProvider.Name(), providerCfg.Model)
@@ -234,11 +234,12 @@ func main() {
 	fmt.Printf("  Memory:   Short-term: 100, Long-term: 1000\n")
 	fmt.Printf("  Logging:  JSON structured\n")
 	fmt.Printf("  Database: %s\n", map[bool]string{true: "Connected", false: "Not connected"}[db != nil])
+	fmt.Printf("  Agents:   Trading + Arbitrage\n")
 	fmt.Printf("  Web UI:   http://localhost:%d\n", webServerPort)
 	fmt.Println()
 
-	// Create agent
-	tradingAgent := agent.New(
+	// Create trading agent
+	tradingAgent := agent.NewTradingAgent(
 		llmProvider,
 		exchangeProvider,
 		registry,
@@ -246,8 +247,24 @@ func main() {
 		metricsInstance,
 		log,
 		db,
-		agent.Config{
+		agent.TradingAgentConfig{
 			Interval:    interval,
+			MaxTokens:   cfg.Agent.MaxTokens,
+			Temperature: cfg.Agent.Temperature,
+		},
+	)
+
+	// Create arbitrage agent (faster interval)
+	arbitrageAgent := agent.NewArbitrageAgent(
+		llmProvider,
+		exchangeProvider,
+		registry,
+		arbitrageManager,
+		metricsInstance,
+		log,
+		db,
+		agent.ArbitrageAgentConfig{
+			Interval:    30 * time.Second, // Faster than trading agent
 			MaxTokens:   cfg.Agent.MaxTokens,
 			Temperature: cfg.Agent.Temperature,
 		},
@@ -296,10 +313,26 @@ func main() {
 		cancel()
 	}()
 
-	// Run agent
-	log.Info("Starting agent")
-	if err := tradingAgent.Run(ctx); err != nil {
-		log.Errorf("Agent error: %v", err)
-		os.Exit(1)
-	}
+	// Run both agents concurrently
+	log.Info("Starting agents")
+
+	// Start trading agent
+	go func() {
+		log.Info("Starting Trading Agent")
+		if err := tradingAgent.Run(ctx); err != nil {
+			log.Errorf("Trading Agent error: %v", err)
+		}
+	}()
+
+	// Start arbitrage agent
+	go func() {
+		log.Info("Starting Arbitrage Agent")
+		if err := arbitrageAgent.Run(ctx); err != nil {
+			log.Errorf("Arbitrage Agent error: %v", err)
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-ctx.Done()
+	log.Info("All agents stopped")
 }

@@ -16,7 +16,7 @@ type DashboardHandler struct {
 	exchange  exchange.Exchange
 	riskMgr   *risk.Manager
 	arbMgr    *arbitrage.Manager
-	agent     *agent.Agent
+	agent     *agent.TradingAgent
 }
 
 // NewDashboardHandler creates a new dashboard handler.
@@ -24,7 +24,7 @@ func NewDashboardHandler(
 	exchange exchange.Exchange,
 	riskMgr *risk.Manager,
 	arbMgr *arbitrage.Manager,
-	agent *agent.Agent,
+	agent *agent.TradingAgent,
 ) *DashboardHandler {
 	return &DashboardHandler{
 		exchange: exchange,
