@@ -266,33 +266,6 @@ export default function Arbitrage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* 配置 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>套利配置</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">最小价差</p>
-              <p className="font-medium">15 bps</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">最大仓位</p>
-              <p className="font-medium">$1,000</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">手续费率</p>
-              <p className="font-medium">0.1%</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">BNB 折扣</p>
-              <p className="font-medium">启用 (25%)</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
