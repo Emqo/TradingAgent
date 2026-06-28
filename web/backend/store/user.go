@@ -9,7 +9,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// UserStore manages user data.
+// UserStoreInterface defines the interface for user stores.
+type UserStoreInterface interface {
+	Init() error
+	Create(username, password, email string) (*models.User, error)
+	GetByUsername(username string) (*models.User, error)
+	GetByID(id int64) (*models.User, error)
+	UpdatePassword(id int64, newPassword string) error
+	VerifyPassword(user *models.User, password string) bool
+}
+
+// UserStore manages user data in PostgreSQL.
 type UserStore struct {
 	db *sql.DB
 }

@@ -23,7 +23,7 @@ type Server struct {
 	router     *gin.Engine
 	db         *sql.DB
 	jwtAuth    *middleware.JWTAuth
-	userStore  *store.UserStore
+	userStore  store.UserStoreInterface
 	authHandler *handlers.AuthHandler
 	dashboardHandler *handlers.DashboardHandler
 }
@@ -71,15 +71,20 @@ func NewServer(
 		dashboardHandler: dashboardHandler,
 	}
 
-	// Initialize user store if database is available
+	// Initialize user store
+	var userStore store.UserStoreInterface
 	if db != nil {
-		userStore := store.NewUserStore(db)
-		if err := userStore.Init(); err != nil {
+		pgStore := store.NewUserStore(db)
+		if err := pgStore.Init(); err != nil {
 			return nil, fmt.Errorf("init user store: %w", err)
 		}
-		s.userStore = userStore
-		s.authHandler = handlers.NewAuthHandler(userStore, jwtAuth)
+		userStore = pgStore
+	} else {
+		// Use in-memory store for development
+		userStore = store.NewMemoryUserStore()
 	}
+	s.userStore = userStore
+	s.authHandler = handlers.NewAuthHandler(userStore, jwtAuth)
 
 	s.setupRoutes()
 

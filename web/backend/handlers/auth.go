@@ -11,12 +11,12 @@ import (
 
 // AuthHandler handles authentication requests.
 type AuthHandler struct {
-	userStore *store.UserStore
+	userStore store.UserStoreInterface
 	jwtAuth   *middleware.JWTAuth
 }
 
 // NewAuthHandler creates a new auth handler.
-func NewAuthHandler(userStore *store.UserStore, jwtAuth *middleware.JWTAuth) *AuthHandler {
+func NewAuthHandler(userStore store.UserStoreInterface, jwtAuth *middleware.JWTAuth) *AuthHandler {
 	return &AuthHandler{
 		userStore: userStore,
 		jwtAuth:   jwtAuth,

@@ -10,10 +10,10 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Settings', href: '/settings', icon: Settings },
-  { name: 'Backtest', href: '/backtest', icon: History },
-  { name: 'Notifications', href: '/notifications', icon: Bell },
+  { name: '仪表盘', href: '/', icon: LayoutDashboard },
+  { name: '设置', href: '/settings', icon: Settings },
+  { name: '回测', href: '/backtest', icon: History },
+  { name: '通知', href: '/notifications', icon: Bell },
 ];
 
 export default function Layout() {
@@ -22,7 +22,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Sidebar */}
+      {/* 侧边栏 */}
       <div className="fixed inset-y-0 left-0 w-64 bg-gray-800 border-r border-gray-700">
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -31,7 +31,7 @@ export default function Layout() {
             <span className="ml-3 text-xl font-bold text-white">TradingAgent</span>
           </div>
 
-          {/* Navigation */}
+          {/* 导航 */}
           <nav className="flex-1 px-4 py-6 space-y-1">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
@@ -52,7 +52,7 @@ export default function Layout() {
             })}
           </nav>
 
-          {/* User info */}
+          {/* 用户信息 */}
           <div className="p-4 border-t border-gray-700">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -69,6 +69,7 @@ export default function Layout() {
               <button
                 onClick={logout}
                 className="ml-auto p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700"
+                title="退出登录"
               >
                 <LogOut className="h-5 w-5" />
               </button>
@@ -77,7 +78,7 @@ export default function Layout() {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* 主内容 */}
       <div className="pl-64">
         <main className="p-8">
           <Outlet />
