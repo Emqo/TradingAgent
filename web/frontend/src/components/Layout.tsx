@@ -25,17 +25,17 @@ const navigation = [
     ],
   },
   {
-    name: '套利',
+    name: '套利 Agent',
     items: [
       { name: '套利监控', href: '/arbitrage', icon: ArrowLeftRight },
       { name: '套利回测', href: '/arbitrage/backtest', icon: History },
     ],
   },
   {
-    name: 'Agent 交易',
+    name: '交易 Agent',
     items: [
-      { name: 'Agent 监控', href: '/agent', icon: Bot },
-      { name: 'Agent 回测', href: '/agent/backtest', icon: BarChart3 },
+      { name: '交易监控', href: '/trading', icon: Bot },
+      { name: '交易回测', href: '/trading/backtest', icon: BarChart3 },
     ],
   },
   {

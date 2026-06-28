@@ -37,7 +37,7 @@ interface AgentStats {
 
 const API_URL = '/api';
 
-export default function Agent() {
+export default function Trading() {
   const [running, setRunning] = useState(true);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [stats, setStats] = useState<AgentStats>({
@@ -91,9 +91,9 @@ export default function Agent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Agent 监控</h1>
+          <h1 className="text-3xl font-bold tracking-tight">交易监控</h1>
           <p className="text-muted-foreground">
-            LLM 驱动的智能交易代理
+            TradingAgent - 市场分析与交易决策
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -104,12 +104,12 @@ export default function Agent() {
             {running ? (
               <>
                 <Pause className="mr-2 h-4 w-4" />
-                暂停 Agent
+                暂停交易
               </>
             ) : (
               <>
                 <Play className="mr-2 h-4 w-4" />
-                启动 Agent
+                启动交易
               </>
             )}
           </Button>

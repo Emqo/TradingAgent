@@ -52,7 +52,7 @@ interface BacktestResult {
   }>;
 }
 
-export default function AgentBacktest() {
+export default function TradingBacktest() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState('');
@@ -97,9 +97,9 @@ export default function AgentBacktest() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Agent 回测</h1>
+        <h1 className="text-3xl font-bold tracking-tight">交易回测</h1>
         <p className="text-muted-foreground">
-          测试 Agent 交易策略的历史表现
+          测试 TradingAgent 交易策略的历史表现
         </p>
         <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-600 text-sm">
           ⚠️ 当前为模拟回测，使用随机数据。真实回测需要接入 Binance 历史数据 API。
