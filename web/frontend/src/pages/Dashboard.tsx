@@ -11,15 +11,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+// Charts will be added when historical data is available
 
 interface DashboardStats {
   total_balance: number;
@@ -31,20 +23,22 @@ interface DashboardStats {
   };
 }
 
-const portfolioData = [
-  { time: '00:00', value: 10000 },
-  { time: '04:00', value: 10200 },
-  { time: '08:00', value: 10150 },
-  { time: '12:00', value: 10400 },
-  { time: '16:00', value: 10350 },
-  { time: '20:00', value: 10500 },
-  { time: '24:00', value: 10450 },
-];
+interface ArbitrageStats {
+  total_opportunities: number;
+  total_profit: number;
+}
+
+interface AgentStats {
+  today_decisions: number;
+  today_pnl: number;
+}
 
 const API_URL = '/api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [arbStats, setArbStats] = useState<ArbitrageStats | null>(null);
+  const [agentStats, setAgentStats] = useState<AgentStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,8 +49,28 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get(`${API_URL}/dashboard/stats`);
-      setStats(res.data);
+      // 获取 Dashboard 统计
+      const dashRes = await axios.get(`${API_URL}/dashboard/stats`);
+      setStats(dashRes.data);
+
+      // 获取套利统计
+      try {
+        const arbRes = await axios.get(`${API_URL}/arbitrage/stats`);
+        setArbStats(arbRes.data);
+      } catch {
+        setArbStats({ total_opportunities: 0, total_profit: 0 });
+      }
+
+      // 获取 Agent 统计
+      try {
+        const agentRes = await axios.get(`${API_URL}/agent/stats`);
+        setAgentStats({
+          today_decisions: agentRes.data.today_decisions || 0,
+          today_pnl: agentRes.data.today_pnl || 0,
+        });
+      } catch {
+        setAgentStats({ today_decisions: 0, today_pnl: 0 });
+      }
     } catch (err) {
       console.error('获取统计数据失败:', err);
     } finally {
@@ -142,32 +156,9 @@ export default function Dashboard() {
           <CardTitle>收益曲线</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={portfolioData}>
-              <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="time" className="text-xs" tickLine={false} axisLine={false} />
-              <YAxis className="text-xs" tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
-                        <p className="font-bold">${payload[0].value?.toLocaleString()}</p>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill="url(#colorValue)" />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            暂无历史数据
+          </div>
         </CardContent>
       </Card>
 
@@ -183,20 +174,14 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">三角套利</span>
-                <Badge variant="default">运行中</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">期现套利</span>
-                <Badge variant="default">运行中</Badge>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">今日机会</span>
-                <span className="font-medium">4 个</span>
+                <span className="font-medium">{arbStats?.total_opportunities || 0} 个</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">今日收益</span>
-                <span className="font-medium text-green-500">+$125</span>
+                <span className="font-medium text-green-500">
+                  +${(arbStats?.total_profit || 0).toFixed(2)}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -216,16 +201,14 @@ export default function Dashboard() {
                 <span className="font-medium">mimo-v2.5-pro</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">决策周期</span>
-                <span className="font-medium">1 分钟</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">今日决策</span>
-                <span className="font-medium">24 次</span>
+                <span className="font-medium">{agentStats?.today_decisions || 0} 次</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">今日收益</span>
-                <span className="font-medium text-green-500">+$85</span>
+                <span className="font-medium text-green-500">
+                  +${(agentStats?.today_pnl || 0).toFixed(2)}
+                </span>
               </div>
             </div>
           </CardContent>
