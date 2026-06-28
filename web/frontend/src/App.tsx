@@ -2,8 +2,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Arbitrage from './pages/Arbitrage';
+import ArbitrageBacktest from './pages/ArbitrageBacktest';
+import Agent from './pages/Agent';
+import AgentBacktest from './pages/AgentBacktest';
 import Settings from './pages/Settings';
-import Backtest from './pages/Backtest';
 import Notifications from './pages/Notifications';
 import Layout from './components/Layout';
 
@@ -29,9 +32,19 @@ function App() {
               </ProtectedRoute>
             }
           >
+            {/* 总览 */}
             <Route index element={<Dashboard />} />
+
+            {/* 套利 */}
+            <Route path="arbitrage" element={<Arbitrage />} />
+            <Route path="arbitrage/backtest" element={<ArbitrageBacktest />} />
+
+            {/* Agent 交易 */}
+            <Route path="agent" element={<Agent />} />
+            <Route path="agent/backtest" element={<AgentBacktest />} />
+
+            {/* 系统 */}
             <Route path="settings" element={<Settings />} />
-            <Route path="backtest" element={<Backtest />} />
             <Route path="notifications" element={<Notifications />} />
           </Route>
         </Routes>
